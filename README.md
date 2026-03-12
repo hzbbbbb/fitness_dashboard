@@ -1,7 +1,85 @@
-# Tauri + React + Typescript
+# FitBoard
 
-This template should help get you started developing with Tauri, React and Typescript in Vite.
+FitBoard 是一个本地优先的健身打卡桌面应用，用来记录每天的训练、补剂完成情况和简单备注，并通过 Dashboard 方式快速查看近期状态。
 
-## Recommended IDE Setup
+项目基于 `Tauri + React + TypeScript + Vite` 构建，整体偏轻量，适合个人日常使用。
 
-- [VS Code](https://code.visualstudio.com/) + [Tauri](https://marketplace.visualstudio.com/items?itemName=tauri-apps.tauri-vscode) + [rust-analyzer](https://marketplace.visualstudio.com/items?itemName=rust-lang.rust-analyzer)
+## 主要功能
+
+- 今日训练管理
+  - 勾选今天是否完成训练
+  - 选择当天训练类型
+  - 支持训练类型较多时在卡片内滚动，不撑高整页
+  - 记录当天备注、训练强度或恢复感受
+
+- 今日补剂打卡
+  - 按配置好的补剂列表逐项勾选
+  - 补剂完成情况会参与每天得分与热力图统计
+
+- 打卡热力图
+  - 展示近 6 个月的每日打卡情况
+  - 使用柔和绿色区分完成度
+  - 点击日期可联动查看当天详情
+
+- 统计概览
+  - 周/月训练次数
+  - 连续打卡天数
+  - 最近 7 天 / 30 天完成率
+
+- 日期详情查看
+  - 查看某一天的训练类型、补剂状态和备注内容
+  - 支持通过热力图快速切换日期
+
+- 设置与数据管理
+  - 自定义训练类型
+  - 自定义补剂项目
+  - 本地数据导入 / 导出
+
+## 项目特点
+
+- 本地优先，适合作为个人习惯追踪工具使用
+- 界面风格清爽、轻量，强调单屏浏览体验
+- 保留桌面应用能力，方便后续扩展本地存储和系统能力
+
+## 技术栈
+
+- `Tauri`
+- `React 19`
+- `TypeScript`
+- `Vite`
+- `Tailwind CSS v4`
+
+## 本地开发
+
+安装依赖：
+
+```bash
+npm install
+```
+
+启动 Web 开发环境：
+
+```bash
+npm run dev
+```
+
+启动 Tauri 桌面开发环境：
+
+```bash
+npm run tauri dev
+```
+
+构建项目：
+
+```bash
+npm run build
+```
+
+## 适用场景
+
+FitBoard 适合用于：
+
+- 日常训练打卡
+- 补剂执行追踪
+- 简单恢复和状态记录
+- 观察最近一段时间的健身习惯稳定性
