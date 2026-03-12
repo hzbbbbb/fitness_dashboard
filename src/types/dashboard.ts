@@ -7,6 +7,7 @@ export type DailyRecord = {
   trainingCompleted: boolean;
   trainingTypes: TrainingType[];
   note: string;
+  fastedWeight?: number;
   supplements: Record<SupplementName, boolean>;
   updatedAt: string;
 };
@@ -31,4 +32,9 @@ export type HeatmapCellData = {
   score: 0 | 1 | 2 | 3;
   isInRange: boolean;
   record?: DailyRecord;
+};
+
+export type WeightEntry = {
+  date: string;
+  weight: number;
 };

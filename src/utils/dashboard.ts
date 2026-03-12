@@ -5,6 +5,7 @@ import type {
   HeatmapCellData,
   SupplementName,
   TrainingType,
+  WeightEntry,
 } from "../types/dashboard";
 
 export const TRAINING_TYPES: TrainingType[] = [
@@ -59,6 +60,30 @@ export function getDateKey(date: Date): string {
   return `${year}-${month}-${day}`;
 }
 
+export function formatWeight(weight?: number): string {
+  if (typeof weight !== "number" || !Number.isFinite(weight)) {
+    return "未记录";
+  }
+
+  return `${weight.toFixed(1)} kg`;
+}
+
+export function sanitizeWeightInput(value: string): number | undefined {
+  const normalized = value.trim().replace(/,/g, ".");
+
+  if (!normalized) {
+    return undefined;
+  }
+
+  const parsed = Number(normalized);
+
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    return undefined;
+  }
+
+  return Math.round(parsed * 10) / 10;
+}
+
 export function sanitizeSupplementName(name: string): string {
   return name.replace(/\s+/g, " ").trim();
 }
@@ -102,6 +127,7 @@ export function createEmptyRecord(
     trainingCompleted: false,
     trainingTypes: [],
     note: "",
+    fastedWeight: undefined,
     supplements: createEmptySupplements(supplementsConfig),
     updatedAt: new Date().toISOString(),
   };
@@ -139,6 +165,10 @@ export function normalizeRecord(
       ),
     },
     note: typeof safeRecord?.note === "string" ? safeRecord.note : "",
+    fastedWeight:
+      typeof safeRecord?.fastedWeight === "number" && Number.isFinite(safeRecord.fastedWeight)
+        ? Math.round(safeRecord.fastedWeight * 10) / 10
+        : undefined,
     updatedAt:
       typeof safeRecord?.updatedAt === "string" && safeRecord.updatedAt
         ? safeRecord.updatedAt
@@ -172,7 +202,7 @@ export function normalizeDashboardData(raw?: LegacyDashboardData): DashboardData
   const todayKey = getDateKey(new Date());
 
   return {
-    version: typeof safeRaw?.version === "number" ? safeRaw.version : 3,
+    version: typeof safeRaw?.version === "number" ? safeRaw.version : 4,
     trainingTypesConfig,
     supplementsConfig,
     recordsByDate: Object.keys(recordsByDate).length
@@ -191,7 +221,7 @@ export function getSafeRecordForDate(
 
 export function createDefaultDashboardData(): DashboardData {
   return normalizeDashboardData({
-    version: 3,
+    version: 4,
     trainingTypesConfig: DEFAULT_TRAINING_TYPES,
     supplementsConfig: DEFAULT_SUPPLEMENTS,
     recordsByDate: {},
@@ -369,6 +399,58 @@ export function formatSupplementCount(
 ): string {
   const count = countCheckedSupplements(record, supplementsConfig);
   return `已吃 ${count}/${supplementsConfig.length || 0} 项补剂`;
+}
+
+export function getWeightEntries(
+  recordsByDate: Record<string, DailyRecord>,
+  endDate: string,
+  days: number,
+): WeightEntry[] {
+  const end = startOfDay(parseDateKey(endDate));
+  const start = new Date(end.getTime() - Math.max(days - 1, 0) * DAY_MS);
+
+  return Object.values(recordsByDate)
+    .filter((record) => {
+      if (typeof record.fastedWeight !== "number" || !Number.isFinite(record.fastedWeight)) {
+        return false;
+      }
+
+      const timestamp = parseDateKey(record.date).getTime();
+      return timestamp >= start.getTime() && timestamp <= end.getTime();
+    })
+    .map((record) => ({
+      date: record.date,
+      weight: Math.round(record.fastedWeight! * 10) / 10,
+    }))
+    .sort((left, right) => left.date.localeCompare(right.date));
+}
+
+export function getPreviousWeightEntry(
+  recordsByDate: Record<string, DailyRecord>,
+  date: string,
+): WeightEntry | null {
+  const targetTime = parseDateKey(date).getTime();
+
+  return (
+    Object.values(recordsByDate)
+      .filter((record) => {
+        if (typeof record.fastedWeight !== "number" || !Number.isFinite(record.fastedWeight)) {
+          return false;
+        }
+
+        return parseDateKey(record.date).getTime() < targetTime;
+      })
+      .map((record) => ({
+        date: record.date,
+        weight: Math.round(record.fastedWeight! * 10) / 10,
+      }))
+      .sort((left, right) => right.date.localeCompare(left.date))[0] ?? null
+  );
+}
+
+export function formatWeightDelta(delta: number): string {
+  const sign = delta > 0 ? "+" : "";
+  return `${sign}${delta.toFixed(1)} kg`;
 }
 
 function startOfDay(date: Date): Date {

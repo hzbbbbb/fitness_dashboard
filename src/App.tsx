@@ -9,12 +9,15 @@ import { SettingsPage } from "./components/SettingsPage";
 import { StatsCards } from "./components/StatsCards";
 import { SupplementPanel } from "./components/SupplementPanel";
 import { TodayPanel } from "./components/TodayPanel";
+import { WeightCard } from "./components/WeightCard";
+import { WeightTrendDialog } from "./components/WeightTrendDialog";
 import { useDashboardData } from "./hooks/useDashboardData";
 import type { TrainingType } from "./types/dashboard";
 import {
   buildHeatmapCells,
   calculateDashboardStats,
   formatFullDate,
+  getPreviousWeightEntry,
   getDateKey,
   getSafeRecordForDate,
   normalizeDashboardData,
@@ -37,6 +40,7 @@ function App() {
   } = useDashboardData();
   const todayKey = getDateKey(new Date());
   const [selectedDate, setSelectedDate] = useState(todayKey);
+  const [weightDialogOpen, setWeightDialogOpen] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
   const [currentView, setCurrentView] = useState<AppView>("dashboard");
 
@@ -57,6 +61,10 @@ function App() {
     selectedDate,
     normalizedData.recordsByDate,
     normalizedData.supplementsConfig,
+  );
+  const previousWeightEntry = useMemo(
+    () => getPreviousWeightEntry(normalizedData.recordsByDate, selectedDate),
+    [normalizedData.recordsByDate, selectedDate],
   );
 
   const handleExport = async () => {
@@ -119,75 +127,86 @@ function App() {
       error={actionError ?? error}
     >
       {currentView === "dashboard" ? (
-        <div className="flex flex-1 flex-col gap-4">
-          <section className="grid gap-4 xl:grid-cols-[minmax(0,1.18fr)_minmax(360px,0.82fr)]">
+        <div className="grid flex-1 gap-3 xl:grid-cols-[minmax(0,820px)_minmax(360px,1fr)]">
+          {/* 左栏：热力图 → 训练 → 补剂（纵向堆叠，紧密相邻） */}
+          <div className="flex min-w-0 flex-col gap-3">
             <ErrorBoundary title="热力图区域异常" description="热力图已降级，其他模块仍可继续使用。">
-              <div className="w-full xl:max-w-[820px]">
-                <HeatmapCalendar
-                  cells={heatmapCells}
-                  selectedDate={selectedDate}
-                  onSelectDate={(date) => {
-                    if (typeof date === "string" && date) {
-                      setSelectedDate(date);
-                    }
-                  }}
-                />
-              </div>
-            </ErrorBoundary>
-            <div className="min-w-0 xl:min-w-[360px]">
-              <StatsCards stats={stats} />
-            </div>
-          </section>
-
-          <section className="grid flex-1 gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_340px]">
-            <ErrorBoundary title="今日交互区域异常" description="训练模块发生错误，已阻止整页黑屏。">
-              <TodayPanel
-                record={selectedRecord}
-                trainingTypesConfig={normalizedData.trainingTypesConfig}
-                onToggleTraining={(type) => {
-                  updateRecord(selectedDate, (record) => {
-                    const currentTypes = Array.isArray(record.trainingTypes)
-                      ? record.trainingTypes
-                      : [];
-                    const hasType = currentTypes.includes(type);
-                    const nextTypes: TrainingType[] = hasType
-                      ? currentTypes.filter((item) => item !== type)
-                      : [...currentTypes, type];
-
-                    return { ...record, trainingTypes: nextTypes };
-                  });
-                }}
-                onWorkoutCompletedChange={(checked) => {
-                  updateRecord(selectedDate, (record) => ({
-                    ...record,
-                    trainingCompleted: Boolean(checked),
-                  }));
-                }}
-                onNoteChange={(note) => {
-                  updateRecord(selectedDate, (record) => ({
-                    ...record,
-                    note: typeof note === "string" ? note : "",
-                  }));
+              <HeatmapCalendar
+                cells={heatmapCells}
+                selectedDate={selectedDate}
+                onSelectDate={(date) => {
+                  if (typeof date === "string" && date) {
+                    setSelectedDate(date);
+                  }
                 }}
               />
             </ErrorBoundary>
-            <ErrorBoundary title="补剂区域异常" description="补剂模块发生错误，已阻止整页黑屏。">
-              <SupplementPanel
-                record={selectedRecord}
-                supplementsConfig={normalizedData.supplementsConfig}
-                onToggleSupplement={(key) => {
-                  if (!key) {
-                    return;
-                  }
+            <div className="grid flex-1 min-h-0 auto-rows-fr gap-3 xl:grid-cols-2">
+              <ErrorBoundary title="今日交互区域异常" description="训练模块发生错误，已阻止整页黑屏。">
+                <TodayPanel
+                  record={selectedRecord}
+                  trainingTypesConfig={normalizedData.trainingTypesConfig}
+                  onToggleTraining={(type) => {
+                    updateRecord(selectedDate, (record) => {
+                      const currentTypes = Array.isArray(record.trainingTypes)
+                        ? record.trainingTypes
+                        : [];
+                      const hasType = currentTypes.includes(type);
+                      const nextTypes: TrainingType[] = hasType
+                        ? currentTypes.filter((item) => item !== type)
+                        : [...currentTypes, type];
 
-                  updateRecord(selectedDate, (record) => ({
-                    ...record,
-                    supplements: {
-                      ...(record.supplements ?? {}),
-                      [key]: !record.supplements?.[key],
-                    },
-                  }));
-                }}
+                      return { ...record, trainingTypes: nextTypes };
+                    });
+                  }}
+                  onWorkoutCompletedChange={(checked) => {
+                    updateRecord(selectedDate, (record) => ({
+                      ...record,
+                      trainingCompleted: Boolean(checked),
+                    }));
+                  }}
+                  onNoteChange={(note) => {
+                    updateRecord(selectedDate, (record) => ({
+                      ...record,
+                      note: typeof note === "string" ? note : "",
+                    }));
+                  }}
+                />
+              </ErrorBoundary>
+              <ErrorBoundary title="补剂区域异常" description="补剂模块发生错误，已阻止整页黑屏。">
+                <SupplementPanel
+                  record={selectedRecord}
+                  supplementsConfig={normalizedData.supplementsConfig}
+                  onToggleSupplement={(key) => {
+                    if (!key) {
+                      return;
+                    }
+
+                    updateRecord(selectedDate, (record) => ({
+                      ...record,
+                      supplements: {
+                        ...(record.supplements ?? {}),
+                        [key]: !record.supplements?.[key],
+                      },
+                    }));
+                  }}
+                />
+              </ErrorBoundary>
+            </div>
+          </div>
+
+          {/* 右栏：统计卡片 → 详情（纵向堆叠） */}
+          <div className="flex min-w-0 flex-col gap-3">
+            <ErrorBoundary title="体重区域异常" description="体重模块已降级，其他模块仍可继续使用。">
+              <StatsCards
+                stats={stats}
+                extraCard={
+                  <WeightCard
+                    record={selectedRecord}
+                    previousEntry={previousWeightEntry}
+                    onOpenTrend={() => setWeightDialogOpen(true)}
+                  />
+                }
               />
             </ErrorBoundary>
             <ErrorBoundary title="日期详情区域异常" description="当天详情已降级为空状态。">
@@ -197,7 +216,7 @@ function App() {
                 supplementsConfig={normalizedData.supplementsConfig}
               />
             </ErrorBoundary>
-          </section>
+          </div>
         </div>
       ) : (
         <ErrorBoundary title="设置页异常" description="设置页已降级，Dashboard 仍可继续使用。">
@@ -218,6 +237,19 @@ function App() {
           />
         </ErrorBoundary>
       )}
+      <WeightTrendDialog
+        open={weightDialogOpen}
+        selectedDate={selectedDate}
+        record={selectedRecord}
+        recordsByDate={normalizedData.recordsByDate}
+        onSaveWeight={(weight) => {
+          updateRecord(selectedDate, (record) => ({
+            ...record,
+            fastedWeight: weight,
+          }));
+        }}
+        onClose={() => setWeightDialogOpen(false)}
+      />
     </DashboardLayout>
   );
 }
