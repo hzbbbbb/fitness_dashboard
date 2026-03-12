@@ -273,7 +273,7 @@ export function buildHeatmapCells(
   baseDate = new Date(),
 ): HeatmapCellData[] {
   const end = startOfDay(baseDate);
-  const start = new Date(end.getFullYear(), end.getMonth() - 5, 1);
+  const start = new Date(end.getFullYear(), end.getMonth() - 6, 1);
   const alignedStart = startOfWeek(start);
   const cells: HeatmapCellData[] = [];
 
@@ -388,7 +388,7 @@ function startOfMonth(date: Date): Date {
   return new Date(date.getFullYear(), date.getMonth(), 1);
 }
 
-function parseDateKey(value: string): Date {
+export function parseDateKey(value: string): Date {
   const [year, month, day] = value.split("-").map(Number);
   return new Date(year, month - 1, day);
 }

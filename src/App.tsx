@@ -18,6 +18,7 @@ import {
   getDateKey,
   getSafeRecordForDate,
   normalizeDashboardData,
+  parseDateKey,
 } from "./utils/dashboard";
 
 function App() {
@@ -51,11 +52,6 @@ function App() {
         normalizedData.supplementsConfig,
       ),
     [normalizedData.recordsByDate, normalizedData.supplementsConfig],
-  );
-  const todayRecord = getSafeRecordForDate(
-    todayKey,
-    normalizedData.recordsByDate,
-    normalizedData.supplementsConfig,
   );
   const selectedRecord = getSafeRecordForDate(
     selectedDate,
@@ -119,33 +115,37 @@ function App() {
           ? "今日概览"
           : "管理本地数据与补剂配置"
       }
-      dateLabel={formatFullDate(new Date())}
+      dateLabel={formatFullDate(parseDateKey(selectedDate))}
       error={actionError ?? error}
     >
       {currentView === "dashboard" ? (
         <div className="flex flex-1 flex-col gap-4">
-          <section className="grid gap-4 xl:grid-cols-[minmax(0,1.45fr)_320px]">
+          <section className="grid gap-4 xl:grid-cols-[minmax(0,1.18fr)_minmax(360px,0.82fr)]">
             <ErrorBoundary title="热力图区域异常" description="热力图已降级，其他模块仍可继续使用。">
-              <HeatmapCalendar
-                cells={heatmapCells}
-                selectedDate={selectedDate}
-                onSelectDate={(date) => {
-                  if (typeof date === "string" && date) {
-                    setSelectedDate(date);
-                  }
-                }}
-              />
+              <div className="w-full xl:max-w-[820px]">
+                <HeatmapCalendar
+                  cells={heatmapCells}
+                  selectedDate={selectedDate}
+                  onSelectDate={(date) => {
+                    if (typeof date === "string" && date) {
+                      setSelectedDate(date);
+                    }
+                  }}
+                />
+              </div>
             </ErrorBoundary>
-            <StatsCards stats={stats} />
+            <div className="min-w-0 xl:min-w-[360px]">
+              <StatsCards stats={stats} />
+            </div>
           </section>
 
           <section className="grid flex-1 gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_340px]">
             <ErrorBoundary title="今日交互区域异常" description="训练模块发生错误，已阻止整页黑屏。">
               <TodayPanel
-                record={todayRecord}
+                record={selectedRecord}
                 trainingTypesConfig={normalizedData.trainingTypesConfig}
                 onToggleTraining={(type) => {
-                  updateRecord(todayKey, (record) => {
+                  updateRecord(selectedDate, (record) => {
                     const currentTypes = Array.isArray(record.trainingTypes)
                       ? record.trainingTypes
                       : [];
@@ -158,13 +158,13 @@ function App() {
                   });
                 }}
                 onWorkoutCompletedChange={(checked) => {
-                  updateRecord(todayKey, (record) => ({
+                  updateRecord(selectedDate, (record) => ({
                     ...record,
                     trainingCompleted: Boolean(checked),
                   }));
                 }}
                 onNoteChange={(note) => {
-                  updateRecord(todayKey, (record) => ({
+                  updateRecord(selectedDate, (record) => ({
                     ...record,
                     note: typeof note === "string" ? note : "",
                   }));
@@ -173,14 +173,14 @@ function App() {
             </ErrorBoundary>
             <ErrorBoundary title="补剂区域异常" description="补剂模块发生错误，已阻止整页黑屏。">
               <SupplementPanel
-                record={todayRecord}
+                record={selectedRecord}
                 supplementsConfig={normalizedData.supplementsConfig}
                 onToggleSupplement={(key) => {
                   if (!key) {
                     return;
                   }
 
-                  updateRecord(todayKey, (record) => ({
+                  updateRecord(selectedDate, (record) => ({
                     ...record,
                     supplements: {
                       ...(record.supplements ?? {}),
