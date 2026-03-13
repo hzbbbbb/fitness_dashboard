@@ -1,0 +1,27 @@
+# macOS
+.DS_Store
+
+# IDE
+.idea/
+.vscode/
+
+# Desktop build artifacts
+fitness_dashboardDesktop/node_modules/
+fitness_dashboardDesktop/dist/
+fitness_dashboardDesktop/src-tauri/target/
+fitness_dashboardDesktop/.cache/
+
+# Desktop local data
+fitness_dashboardDesktop/data.json
+fitness_dashboardDesktop/backup.json
+fitness_dashboardDesktop/*.local.json
+
+# Mobile build artifacts
+fitness_dashboardMobile/.gradle/
+fitness_dashboardMobile/build/
+fitness_dashboardMobile/composeApp/build/
+fitness_dashboardMobile/iosApp/build/
+
+# Android / local config
+fitness_dashboardMobile/local.properties
+fitness_dashboardMobile/.kotlin/

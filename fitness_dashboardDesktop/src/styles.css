@@ -1,0 +1,80 @@
+@import "tailwindcss";
+
+:root {
+  color: #243127;
+  background:
+    radial-gradient(circle at top left, rgba(166, 217, 183, 0.32), transparent 24%),
+    linear-gradient(180deg, #f7f4ea 0%, #f3f6ef 52%, #eef5ee 100%);
+  font-family:
+    "SF Pro Display",
+    "PingFang SC",
+    "Hiragino Sans GB",
+    "Microsoft YaHei",
+    sans-serif;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  color: #243127;
+  background:
+    radial-gradient(circle at top left, rgba(166, 217, 183, 0.32), transparent 24%),
+    linear-gradient(180deg, #f7f4ea 0%, #f3f6ef 52%, #eef5ee 100%);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+::selection {
+  background: rgba(118, 191, 132, 0.28);
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(212, 220, 208, 0.55);
+}
+
+::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: rgba(135, 161, 142, 0.46);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(117, 145, 124, 0.62);
+}
+
+.fitboard-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(135, 161, 142, 0.34) transparent;
+}
+
+.fitboard-scrollbar::-webkit-scrollbar {
+  width: 6px;
+}
+
+.fitboard-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.fitboard-scrollbar::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: rgba(135, 161, 142, 0.34);
+}
+
+.fitboard-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(117, 145, 124, 0.46);
+}
