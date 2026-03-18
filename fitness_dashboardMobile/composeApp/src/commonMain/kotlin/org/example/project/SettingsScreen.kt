@@ -50,7 +50,6 @@ fun SettingsScreen(
     ) {
         Spacer(Modifier.height(12.dp))
 
-        // Header
         Column(Modifier.padding(horizontal = 4.dp)) {
             Text(
                 text = "设置",
@@ -60,7 +59,7 @@ fun SettingsScreen(
             )
             Spacer(Modifier.height(3.dp))
             Text(
-                text = "训练与补剂配置",
+                text = "训练、补剂与本地数据说明",
                 fontSize = 14.sp,
                 color = FitBoardColors.textSecondary
             )
@@ -68,8 +67,7 @@ fun SettingsScreen(
 
         Spacer(Modifier.height(20.dp))
 
-        // ── Training types section ──
-        TrainingTypesSection(
+        TrainingSettingsSection(
             options = state.trainingOptions,
             onAdd = { name ->
                 if (name.isNotBlank() && name !in state.trainingOptions) {
@@ -78,18 +76,19 @@ fun SettingsScreen(
             },
             onDelete = { name ->
                 if (state.trainingOptions.size > 1) {
-                    onStateChange(state.copy(
-                        trainingOptions = state.trainingOptions - name,
-                        selectedTraining = if (state.selectedTraining == name) null else state.selectedTraining
-                    ))
+                    onStateChange(
+                        state.copy(
+                            trainingOptions = state.trainingOptions - name,
+                            selectedTraining = if (state.selectedTraining == name) null else state.selectedTraining
+                        )
+                    )
                 }
             }
         )
 
         Spacer(Modifier.height(12.dp))
 
-        // ── Supplement section ──
-        SupplementSection(
+        SupplementSettingsSection(
             options = state.supplementOptions,
             onAdd = { name ->
                 if (name.isNotBlank() && name !in state.supplementOptions) {
@@ -98,48 +97,45 @@ fun SettingsScreen(
             },
             onDelete = { name ->
                 if (state.supplementOptions.size > 1) {
-                    onStateChange(state.copy(
-                        supplementOptions = state.supplementOptions - name,
-                        checkedSupplements = state.checkedSupplements - name
-                    ))
+                    onStateChange(
+                        state.copy(
+                            supplementOptions = state.supplementOptions - name,
+                            checkedSupplements = state.checkedSupplements - name
+                        )
+                    )
                 }
             }
         )
 
         Spacer(Modifier.height(12.dp))
 
-        // ── Local data section ──
         LocalDataSection()
 
         Spacer(Modifier.height(12.dp))
 
-        // ── About section ──
         AboutSection()
 
         Spacer(Modifier.height(28.dp))
     }
 }
 
-// ─── Training Types Section ────────────────────────────────────────────────────
-
 @Composable
-private fun TrainingTypesSection(
+internal fun TrainingSettingsSection(
     options: List<String>,
     onAdd: (String) -> Unit,
     onDelete: (String) -> Unit
 ) {
     var draft by remember { mutableStateOf("") }
 
-    SettingsCard(label = "训练", title = "训练类型管理") {
+    SettingsCard(label = "训练", title = "训练类型设置") {
         Text(
-            text = "管理首页训练勾选清单，新增后可在首页直接选择。",
+            text = "管理记录页可选的训练类型。第一版继续使用本地编辑，不做独立配置流程。",
             fontSize = 13.sp,
             color = FitBoardColors.textSecondary,
             lineHeight = 20.sp
         )
         Spacer(Modifier.height(12.dp))
 
-        // Add input row
         AddInputRow(
             value = draft,
             placeholder = "新增训练类型",
@@ -153,7 +149,6 @@ private fun TrainingTypesSection(
 
         Spacer(Modifier.height(10.dp))
 
-        // List
         if (options.isEmpty()) {
             EmptyHint("当前没有训练类型配置，可先新增一个训练类型。")
         } else {
@@ -161,7 +156,7 @@ private fun TrainingTypesSection(
                 options.forEach { name ->
                     SettingsItemRow(
                         name = name,
-                        description = "用于首页训练打卡清单",
+                        description = "用于记录页的训练单选列表",
                         canDelete = options.size > 1,
                         onDelete = { onDelete(name) }
                     )
@@ -171,19 +166,17 @@ private fun TrainingTypesSection(
     }
 }
 
-// ─── Supplement Section ────────────────────────────────────────────────────────
-
 @Composable
-private fun SupplementSection(
+internal fun SupplementSettingsSection(
     options: List<String>,
     onAdd: (String) -> Unit,
     onDelete: (String) -> Unit
 ) {
     var draft by remember { mutableStateOf("") }
 
-    SettingsCard(label = "补剂", title = "补剂管理") {
+    SettingsCard(label = "补剂", title = "补剂类型设置") {
         Text(
-            text = "管理每日补剂清单，新增后会同步到首页打卡选项。",
+            text = "管理记录页可选的补剂类型。第一版先保留本地编辑与列表占位。",
             fontSize = 13.sp,
             color = FitBoardColors.textSecondary,
             lineHeight = 20.sp
@@ -210,7 +203,7 @@ private fun SupplementSection(
                 options.forEach { name ->
                     SettingsItemRow(
                         name = name,
-                        description = "用于首页补剂打卡",
+                        description = "用于记录页的补剂多选列表",
                         canDelete = options.size > 1,
                         onDelete = { onDelete(name) }
                     )
@@ -220,52 +213,45 @@ private fun SupplementSection(
     }
 }
 
-// ─── Local Data Section ────────────────────────────────────────────────────────
-
 @Composable
 private fun LocalDataSection() {
-    SettingsCard(label = "说明", title = "本地数据") {
+    SettingsCard(label = "说明", title = "本地数据与导入导出") {
         Text(
-            text = "当前数据仅保存在本地内存中，退出应用后将重置。后续版本将支持本地持久化和 JSON 导入导出。",
+            text = "当前记录只保存在本地页面状态中，退出应用后会重置。后续版本再补持久化、导入和导出能力。",
             fontSize = 13.sp,
             color = FitBoardColors.textSecondary,
             lineHeight = 20.sp
         )
         Spacer(Modifier.height(12.dp))
 
-        // Import / Export placeholders
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             PlaceholderActionButton(
-                label = "导出记录",
+                label = "导出占位",
                 modifier = Modifier.weight(1f)
             )
             PlaceholderActionButton(
-                label = "导入记录",
+                label = "导入占位",
                 modifier = Modifier.weight(1f)
             )
         }
     }
 }
 
-// ─── About Section ────────────────────────────────────────────────────────────
-
 @Composable
 private fun AboutSection() {
-    SettingsCard(label = "关于", title = "关于 FitBoard") {
+    SettingsCard(label = "关于", title = "关于应用") {
         AboutRow(key = "应用名称", value = "FitBoard")
         Spacer(Modifier.height(8.dp))
-        AboutRow(key = "版本", value = "1.0.0 (MVP)")
+        AboutRow(key = "当前定位", value = "轻量健康记录助手")
         Spacer(Modifier.height(8.dp))
-        AboutRow(key = "技术", value = "Compose Multiplatform")
+        AboutRow(key = "界面职责", value = "首页概览 / 记录录入 / 设置配置")
         Spacer(Modifier.height(8.dp))
-        AboutRow(key = "定位", value = "本地健康记录助手")
+        AboutRow(key = "技术实现", value = "Compose Multiplatform")
     }
 }
-
-// ─── Reusable Settings Composables ────────────────────────────────────────────
 
 @Composable
 private fun SettingsCard(

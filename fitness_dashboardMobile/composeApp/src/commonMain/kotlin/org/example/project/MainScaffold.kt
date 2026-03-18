@@ -76,15 +76,15 @@ fun MainScaffold() {
         Column(Modifier.fillMaxSize()) {
             Box(Modifier.weight(1f)) {
                 when (currentScreen) {
-                    AppScreen.Home -> DashboardScreen(
+                    AppScreen.Home -> HomeScreen(
                         state = appState,
                         dateInfo = dateInfo,
-                        today = today,
-                        onStateChange = { appState = it }
+                        today = today
                     )
                     AppScreen.Records -> RecordsScreen(
                         state = appState,
-                        today = today
+                        today = today,
+                        onStateChange = { appState = it }
                     )
                     AppScreen.Settings -> SettingsScreen(
                         state = appState,
