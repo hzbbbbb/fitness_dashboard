@@ -51,6 +51,9 @@ fun HomeScreen(
         Spacer(Modifier.height(12.dp))
 
         TodaySummaryCard(state = state)
+        Spacer(Modifier.height(12.dp))
+
+        HealthSummaryCard()
         Spacer(Modifier.height(28.dp))
     }
 }
@@ -264,6 +267,94 @@ internal fun TodaySummaryCard(state: AppUiState) {
                 if (it.length > 34) it.take(34) + "…" else it
             } ?: "暂无备注",
             hasValue = state.note.isNotBlank()
+        )
+    }
+}
+
+@Composable
+private fun HealthSummaryCard() {
+    val healthState = currentHealthSummaryState()
+
+    FitCard {
+        CardLabel("健康")
+        Spacer(Modifier.height(2.dp))
+        CardTitle("Apple 健康摘要")
+        Spacer(Modifier.height(12.dp))
+
+        when (healthState.authorizationState) {
+            HealthAuthorizationState.Loading -> {
+                HealthEmptyState(text = healthState.statusMessage)
+            }
+
+            HealthAuthorizationState.Denied,
+            HealthAuthorizationState.Unavailable,
+            HealthAuthorizationState.Error,
+            HealthAuthorizationState.Idle -> {
+                HealthEmptyState(text = healthState.statusMessage)
+            }
+
+            HealthAuthorizationState.Authorized -> {
+                SummaryRow(
+                    label = "今日步数",
+                    value = if (healthState.hasTodaySteps) {
+                        "${healthState.todaySteps} 步"
+                    } else {
+                        "暂无步数数据"
+                    },
+                    hasValue = healthState.hasTodaySteps
+                )
+                Spacer(Modifier.height(8.dp))
+
+                SummaryRow(
+                    label = "最近睡眠",
+                    value = if (healthState.hasSleepDuration) {
+                        formatSleepDuration(healthState.sleepDurationHours)
+                    } else {
+                        "暂无睡眠数据"
+                    },
+                    hasValue = healthState.hasSleepDuration
+                )
+
+                if (healthState.statusMessage.isNotBlank()) {
+                    Spacer(Modifier.height(10.dp))
+                    Text(
+                        text = healthState.statusMessage,
+                        fontSize = 12.sp,
+                        lineHeight = 18.sp,
+                        color = FitBoardColors.textSecondary
+                    )
+                }
+
+                if (healthState.lastUpdatedAt.isNotBlank()) {
+                    Spacer(Modifier.height(10.dp))
+                    Text(
+                        text = "更新于 ${healthState.lastUpdatedAt}",
+                        fontSize = 11.sp,
+                        color = FitBoardColors.textHint,
+                        modifier = Modifier.fillMaxWidth(),
+                        textAlign = TextAlign.End
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun HealthEmptyState(text: String) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(14.dp))
+            .border(1.dp, FitBoardColors.innerPanelBorder, RoundedCornerShape(14.dp))
+            .background(FitBoardColors.innerPanelBg)
+            .padding(horizontal = 14.dp, vertical = 14.dp)
+    ) {
+        Text(
+            text = text,
+            fontSize = 13.sp,
+            lineHeight = 20.sp,
+            color = FitBoardColors.textSecondary
         )
     }
 }

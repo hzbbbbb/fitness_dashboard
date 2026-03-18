@@ -4,5 +4,7 @@
 <dict>
 	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
+	<key>NSHealthShareUsageDescription</key>
+	<string>FitBoard 需要读取你的步数和睡眠时长，用于在首页展示轻量健康摘要。</string>
 </dict>
 </plist>

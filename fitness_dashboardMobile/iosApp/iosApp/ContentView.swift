@@ -11,11 +11,19 @@ struct ComposeView: UIViewControllerRepresentable {
 }
 
 struct ContentView: View {
+    @Environment(\.scenePhase) private var scenePhase
+    @StateObject private var healthKitManager = HealthKitManager()
+
     var body: some View {
         ComposeView()
             .ignoresSafeArea()
+            .task {
+                healthKitManager.bootstrapIfNeeded()
+            }
+            .onChange(of: scenePhase) { _, newPhase in
+                if newPhase == .active {
+                    healthKitManager.refreshIfPossible()
+                }
+            }
     }
 }
-
-
-
