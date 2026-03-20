@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -126,6 +127,19 @@ fun SettingsScreen(
             )
         }
 
+        SettingsPage.Style -> SettingsSubpageScaffold(
+            title = "风格设置",
+            subtitle = "主题模式与热力图颜色预设",
+            onBack = { currentPage = SettingsPage.Home }
+        ) {
+            StyleSettingsSection(
+                themeMode = state.themeMode,
+                heatmapAccent = state.heatmapAccent,
+                onThemeChange = { onStateChange(state.copy(themeMode = it)) },
+                onHeatmapAccentChange = { onStateChange(state.copy(heatmapAccent = it)) }
+            )
+        }
+
         SettingsPage.LocalData -> SettingsSubpageScaffold(
             title = "本地数据导入与导出",
             subtitle = "当前仅提供入口和占位说明",
@@ -150,6 +164,7 @@ private enum class SettingsPage {
     Supplement,
     SleepGoal,
     StepGoal,
+    Style,
     LocalData,
     About
 }
@@ -177,7 +192,7 @@ private fun SettingsHomeScreen(
             )
             Spacer(Modifier.height(3.dp))
             Text(
-                text = "目标、类型与本地说明",
+                text = "目标、类型、风格与本地说明",
                 fontSize = 14.sp,
                 color = FitBoardColors.textSecondary
             )
@@ -210,6 +225,13 @@ private fun SettingsHomeScreen(
             title = "步数目标设置",
             description = "${state.stepGoal}步",
             onClick = { onNavigate(SettingsPage.StepGoal) }
+        )
+        Spacer(Modifier.height(12.dp))
+
+        SettingsEntryCard(
+            title = "风格设置",
+            description = "${state.themeMode.title} · ${state.heatmapAccent.title}热力图",
+            onClick = { onNavigate(SettingsPage.Style) }
         )
         Spacer(Modifier.height(12.dp))
 
@@ -247,13 +269,8 @@ private fun SettingsSubpageScaffold(
         Spacer(Modifier.height(12.dp))
 
         Column(Modifier.padding(horizontal = 4.dp)) {
-            Text(
-                text = "‹ 返回",
-                fontSize = 13.sp,
-                color = FitBoardColors.badgeActiveText,
-                modifier = Modifier.clickable { onBack() }
-            )
-            Spacer(Modifier.height(10.dp))
+            SettingsSubpageBackButton(onBack = onBack)
+            Spacer(Modifier.height(14.dp))
             Text(
                 text = title,
                 fontSize = 26.sp,
@@ -271,6 +288,42 @@ private fun SettingsSubpageScaffold(
         Spacer(Modifier.height(20.dp))
         content()
         Spacer(Modifier.height(28.dp))
+    }
+}
+
+@Composable
+private fun SettingsSubpageBackButton(onBack: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .clip(RoundedCornerShape(18.dp))
+            .border(1.dp, FitBoardColors.countBadgeBorder, RoundedCornerShape(18.dp))
+            .background(FitBoardColors.cardBg)
+            .clickable { onBack() }
+            .defaultMinSize(minHeight = 42.dp)
+            .padding(horizontal = 14.dp, vertical = 10.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            modifier = Modifier
+                .clip(RoundedCornerShape(10.dp))
+                .background(FitBoardColors.badgeActiveBg)
+                .padding(horizontal = 8.dp, vertical = 4.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = "‹",
+                fontSize = 14.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = FitBoardColors.badgeActiveText
+            )
+        }
+        Text(
+            text = "返回",
+            fontSize = 14.sp,
+            fontWeight = FontWeight.Medium,
+            color = FitBoardColors.textPrimary
+        )
     }
 }
 
@@ -405,6 +458,68 @@ private fun AboutSection() {
         AboutRow(key = "界面职责", value = "首页概览 / 健康评分 / 记录录入 / 设置配置")
         Spacer(Modifier.height(8.dp))
         AboutRow(key = "技术实现", value = "Compose Multiplatform")
+    }
+}
+
+@Composable
+private fun StyleSettingsSection(
+    themeMode: AppThemeMode,
+    heatmapAccent: HeatmapAccent,
+    onThemeChange: (AppThemeMode) -> Unit,
+    onHeatmapAccentChange: (HeatmapAccent) -> Unit
+) {
+    SettingsCard(label = "主题", title = "App 主题风格") {
+        Text(
+            text = "淡绿色模式为当前默认主题，后续可继续扩展持久化。",
+            fontSize = 13.sp,
+            color = FitBoardColors.textSecondary,
+            lineHeight = 20.sp
+        )
+        Spacer(Modifier.height(12.dp))
+
+        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            AppThemeMode.entries.forEach { option ->
+                StyleOptionCard(
+                    title = if (option == AppThemeMode.SoftGreen) {
+                        "${option.title}（默认）"
+                    } else {
+                        option.title
+                    },
+                    description = option.subtitle,
+                    selected = option == themeMode,
+                    swatches = previewSwatchesForTheme(option),
+                    onClick = { onThemeChange(option) }
+                )
+            }
+        }
+    }
+
+    Spacer(Modifier.height(12.dp))
+
+    SettingsCard(label = "热力图", title = "热力图颜色") {
+        Text(
+            text = "切换记录格子的强调色，无记录状态仍保持低对比。",
+            fontSize = 13.sp,
+            color = FitBoardColors.textSecondary,
+            lineHeight = 20.sp
+        )
+        Spacer(Modifier.height(12.dp))
+
+        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            HeatmapAccent.entries.forEach { option ->
+                StyleOptionCard(
+                    title = if (option == HeatmapAccent.Green) {
+                        "${option.title}（默认）"
+                    } else {
+                        option.title
+                    },
+                    description = option.subtitle,
+                    selected = option == heatmapAccent,
+                    swatches = previewSwatchesForAccent(option),
+                    onClick = { onHeatmapAccentChange(option) }
+                )
+            }
+        }
     }
 }
 
@@ -576,6 +691,122 @@ private fun SettingsEntryCard(
         }
     }
 }
+
+@Composable
+private fun StyleOptionCard(
+    title: String,
+    description: String,
+    selected: Boolean,
+    swatches: List<Color>,
+    onClick: () -> Unit
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(16.dp))
+            .border(
+                1.dp,
+                if (selected) FitBoardColors.activeCardBorder else FitBoardColors.inactiveCardBorder,
+                RoundedCornerShape(16.dp)
+            )
+            .background(if (selected) FitBoardColors.activeCardBg else FitBoardColors.inactiveCardBg)
+            .clickable { onClick() }
+            .padding(horizontal = 14.dp, vertical = 14.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                Text(
+                    text = title,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = FitBoardColors.textPrimary
+                )
+                Text(
+                    text = description,
+                    fontSize = 12.sp,
+                    lineHeight = 18.sp,
+                    color = FitBoardColors.textHint
+                )
+            }
+            Spacer(Modifier.width(12.dp))
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                swatches.forEach { color ->
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(6.dp))
+                            .border(1.dp, FitBoardColors.cardBorder, RoundedCornerShape(6.dp))
+                            .background(color)
+                            .width(16.dp)
+                            .height(16.dp)
+                    )
+                }
+                if (selected) {
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(FitBoardColors.badgeActiveBg)
+                            .padding(horizontal = 9.dp, vertical = 4.dp)
+                    ) {
+                        Text(
+                            text = "当前",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = FitBoardColors.badgeActiveText
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+private fun previewSwatchesForTheme(themeMode: AppThemeMode): List<Color> =
+    when (themeMode) {
+        AppThemeMode.SoftGreen -> listOf(
+            Color(0xFFF7F4EA),
+            Color(0xFFF9FBF6),
+            Color(0xFFDFF0E2)
+        )
+        AppThemeMode.White -> listOf(
+            Color(0xFFFAFAF7),
+            Color(0xFFFFFFFF),
+            Color(0xFFF0F4F0)
+        )
+        AppThemeMode.Dark -> listOf(
+            Color(0xFF111714),
+            Color(0xFF19211D),
+            Color(0xFF24342B)
+        )
+    }
+
+private fun previewSwatchesForAccent(accent: HeatmapAccent): List<Color> =
+    when (accent) {
+        HeatmapAccent.Green -> listOf(
+            Color(0xFFE8EEE4),
+            Color(0xFFBED9C1),
+            Color(0xFF6AAA7A)
+        )
+        HeatmapAccent.Blue -> listOf(
+            Color(0xFFECEFEA),
+            Color(0xFFC6DFEC),
+            Color(0xFF6FA8C7)
+        )
+        HeatmapAccent.Amber -> listOf(
+            Color(0xFFECEFEA),
+            Color(0xFFF2DEC1),
+            Color(0xFFC99861)
+        )
+    }
 
 private fun formatSleepGoal(hour: Int, minute: Int): String =
     if (minute == 0) {

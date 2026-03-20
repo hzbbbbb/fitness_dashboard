@@ -132,53 +132,68 @@ internal fun HeatmapCard(
 
         Spacer(Modifier.height(12.dp))
 
-        Row(modifier = Modifier.fillMaxWidth()) {
-            weekLabels.forEach { label ->
-                Box(
-                    modifier = Modifier.weight(1f),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = label,
-                        fontSize = 10.sp,
-                        color = FitBoardColors.textHint
-                    )
-                }
-            }
-        }
-
-        Spacer(Modifier.height(5.dp))
-
-        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            for (row in 0..4) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
-                    for (col in 0..6) {
-                        val cellIndex = row * 7 + col
-                        val dayOffset = cellIndex - todayIndex
-                        HeatmapCell(
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(18.dp))
+                .border(1.dp, FitBoardColors.innerPanelBorder, RoundedCornerShape(18.dp))
+                .background(FitBoardColors.innerPanelBg)
+                .padding(horizontal = 12.dp, vertical = 12.dp)
+        ) {
+            Column {
+                Row(modifier = Modifier.fillMaxWidth()) {
+                    weekLabels.forEach { label ->
+                        Box(
                             modifier = Modifier.weight(1f),
-                            dayOffset = dayOffset,
-                            hasRecord = dayOffset == 0 && hasRecordToday,
-                            isToday = dayOffset == 0
-                        )
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = label,
+                                fontSize = 10.sp,
+                                color = FitBoardColors.textHint
+                            )
+                        }
+                    }
+                }
+
+                Spacer(Modifier.height(8.dp))
+
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    for (row in 0..4) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            for (col in 0..6) {
+                                val cellIndex = row * 7 + col
+                                val dayOffset = cellIndex - todayIndex
+                                HeatmapCell(
+                                    modifier = Modifier.weight(1f),
+                                    dayOffset = dayOffset,
+                                    hasRecord = dayOffset == 0 && hasRecordToday,
+                                    isToday = dayOffset == 0
+                                )
+                            }
+                        }
                     }
                 }
             }
         }
 
-        Spacer(Modifier.height(10.dp))
+        Spacer(Modifier.height(12.dp))
 
         Row(
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            LegendDot(FitBoardColors.heatCellTodayRecord)
-            Text("有记录", fontSize = 10.sp, color = FitBoardColors.textHint)
-            LegendDot(FitBoardColors.heatCellEmpty)
-            Text("无记录", fontSize = 10.sp, color = FitBoardColors.textHint)
+            HeatmapLegendPill(
+                color = FitBoardColors.heatCellTodayRecord,
+                text = "有记录"
+            )
+            HeatmapLegendPill(
+                color = FitBoardColors.heatCellEmpty,
+                text = "无记录"
+            )
         }
     }
 }
@@ -190,29 +205,70 @@ private fun HeatmapCell(
     hasRecord: Boolean,
     isToday: Boolean
 ) {
-    val bgColor = when {
-        dayOffset > 0 -> Color.Transparent
-        dayOffset < -29 -> Color.Transparent
+    if (dayOffset > 0 || dayOffset < -29) {
+        Spacer(modifier = modifier.aspectRatio(1f))
+        return
+    }
+
+    val fillColor = when {
         isToday && hasRecord -> FitBoardColors.heatCellTodayRecord
         isToday -> FitBoardColors.heatCellToday
         hasRecord -> FitBoardColors.heatCellRecord
         else -> FitBoardColors.heatCellEmpty
     }
-    val shape = RoundedCornerShape(6.dp)
+    val borderColor = when {
+        isToday && hasRecord -> FitBoardColors.heatTodayBorder
+        isToday -> FitBoardColors.heatTodayBorder
+        hasRecord -> FitBoardColors.heatTodayBorder.copy(alpha = 0.72f)
+        else -> FitBoardColors.cardBorder.copy(alpha = 0.4f)
+    }
+    val outerShape = RoundedCornerShape(8.dp)
+    val innerShape = RoundedCornerShape(6.dp)
 
     Box(
         modifier = modifier
             .aspectRatio(1f)
-            .clip(shape)
-            .then(
-                if (isToday && !hasRecord) {
-                    Modifier.border(1.5.dp, FitBoardColors.heatTodayBorder, shape)
+            .clip(outerShape)
+            .border(1.dp, borderColor, outerShape)
+            .background(
+                if (hasRecord || isToday) {
+                    FitBoardColors.cardBg
                 } else {
-                    Modifier
+                    FitBoardColors.innerPanelBg
                 }
             )
-            .background(bgColor)
-    )
+            .padding(2.dp)
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .clip(innerShape)
+                .background(fillColor)
+        )
+    }
+}
+
+@Composable
+private fun HeatmapLegendPill(
+    color: Color,
+    text: String
+) {
+    Row(
+        modifier = Modifier
+            .clip(RoundedCornerShape(18.dp))
+            .border(1.dp, FitBoardColors.innerPanelBorder, RoundedCornerShape(18.dp))
+            .background(FitBoardColors.innerPanelBg)
+            .padding(horizontal = 10.dp, vertical = 6.dp),
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        LegendDot(color)
+        Text(
+            text = text,
+            fontSize = 10.sp,
+            color = FitBoardColors.textHint
+        )
+    }
 }
 
 @Composable
@@ -220,7 +276,8 @@ private fun LegendDot(color: Color) {
     Box(
         modifier = Modifier
             .size(10.dp)
-            .clip(RoundedCornerShape(3.dp))
+            .clip(RoundedCornerShape(4.dp))
+            .border(1.dp, FitBoardColors.cardBg, RoundedCornerShape(4.dp))
             .background(color)
     )
 }

@@ -1,23 +1,31 @@
 package org.example.project
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
-import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
@@ -37,6 +45,8 @@ data class AppUiState(
     val checkedSupplements: Set<String> = emptySet(),
     val note: String = "",
     val isSaved: Boolean = false,
+    val themeMode: AppThemeMode = AppThemeMode.SoftGreen,
+    val heatmapAccent: HeatmapAccent = HeatmapAccent.Green,
     val sleepGoalHours: Int = 8,
     val sleepGoalMinutes: Int = 0,
     val stepGoal: Int = 8000,
@@ -65,46 +75,51 @@ fun MainScaffold() {
     val today = remember { getCurrentDate() }
     val dateInfo = remember { getDateInfo() }
 
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(
-                Brush.verticalGradient(
-                    listOf(FitBoardColors.bgGradientStart, FitBoardColors.bgGradientEnd)
-                )
-            )
+    ProvideFitBoardPalette(
+        themeMode = appState.themeMode,
+        heatmapAccent = appState.heatmapAccent
     ) {
-        // Column layout: content takes all vertical space above the nav bar.
-        // NavigationBar's windowInsets handles the iOS home indicator internally,
-        // so screen content naturally stops above the physical bar area.
-        Column(Modifier.fillMaxSize()) {
-            Box(Modifier.weight(1f)) {
-                when (currentScreen) {
-                    AppScreen.Home -> HomeScreen(
-                        state = appState,
-                        dateInfo = dateInfo,
-                        today = today
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(
+                    Brush.verticalGradient(
+                        listOf(FitBoardColors.bgGradientStart, FitBoardColors.bgGradientEnd)
                     )
-                    AppScreen.Score -> HealthScoreScreen(
-                        state = appState,
-                        today = today
-                    )
-                    AppScreen.Records -> RecordsScreen(
-                        state = appState,
-                        today = today,
-                        onStateChange = { appState = it }
-                    )
-                    AppScreen.Settings -> SettingsScreen(
-                        state = appState,
-                        onStateChange = { appState = it }
-                    )
+                )
+        ) {
+            // Column layout: content takes all vertical space above the nav bar.
+            // NavigationBar's windowInsets handles the iOS home indicator internally,
+            // so screen content naturally stops above the physical bar area.
+            Column(Modifier.fillMaxSize()) {
+                Box(Modifier.weight(1f)) {
+                    when (currentScreen) {
+                        AppScreen.Home -> HomeScreen(
+                            state = appState,
+                            dateInfo = dateInfo,
+                            today = today
+                        )
+                        AppScreen.Score -> HealthScoreScreen(
+                            state = appState,
+                            today = today
+                        )
+                        AppScreen.Records -> RecordsScreen(
+                            state = appState,
+                            today = today,
+                            onStateChange = { appState = it }
+                        )
+                        AppScreen.Settings -> SettingsScreen(
+                            state = appState,
+                            onStateChange = { appState = it }
+                        )
+                    }
                 }
-            }
 
-            FitBoardBottomNav(
-                current = currentScreen,
-                onSelect = { currentScreen = it }
-            )
+                FitBoardBottomNav(
+                    current = currentScreen,
+                    onSelect = { currentScreen = it }
+                )
+            }
         }
     }
 }
@@ -121,30 +136,72 @@ private fun FitBoardBottomNav(
         windowInsets = WindowInsets.navigationBars,
         tonalElevation = 0.dp
     ) {
-        AppScreen.entries.forEach { screen ->
-            val selected = current == screen
-            NavigationBarItem(
-                icon = {
-                    Text(
-                        text = screen.icon,
-                        fontSize = 18.sp
-                    )
-                },
-                label = {
-                    Text(
-                        text = screen.label,
-                        fontSize = 11.sp
-                    )
-                },
-                selected = selected,
-                onClick = { onSelect(screen) },
-                colors = NavigationBarItemDefaults.colors(
-                    selectedIconColor = FitBoardColors.badgeActiveText,
-                    selectedTextColor = FitBoardColors.badgeActiveText,
-                    indicatorColor = FitBoardColors.badgeActiveBg,
-                    unselectedIconColor = FitBoardColors.badgeInactiveText,
-                    unselectedTextColor = FitBoardColors.badgeInactiveText,
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 10.dp, vertical = 6.dp)
+        ) {
+            AppScreen.entries.forEach { screen ->
+                FitBoardBottomNavItem(
+                    screen = screen,
+                    selected = current == screen,
+                    onClick = { onSelect(screen) },
+                    modifier = Modifier.weight(1f)
                 )
+            }
+        }
+    }
+}
+
+@Composable
+private fun FitBoardBottomNavItem(
+    screen: AppScreen,
+    selected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val containerColor = if (selected) FitBoardColors.activeCardBg else Color.Transparent
+    val borderColor = if (selected) {
+        FitBoardColors.activeCardBorder
+    } else {
+        Color.Transparent
+    }
+    val iconChipColor = if (selected) FitBoardColors.badgeActiveBg else FitBoardColors.badgeInactiveBg
+    val iconColor = if (selected) FitBoardColors.badgeActiveText else FitBoardColors.badgeInactiveText
+    val labelColor = if (selected) FitBoardColors.textPrimary else FitBoardColors.textSecondary
+
+    Box(
+        modifier = modifier
+            .padding(horizontal = 4.dp)
+            .clip(RoundedCornerShape(22.dp))
+            .border(1.dp, borderColor, RoundedCornerShape(22.dp))
+            .background(containerColor)
+            .clickable { onClick() }
+            .padding(horizontal = 6.dp, vertical = 8.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(28.dp)
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(iconChipColor),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = screen.icon,
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = iconColor
+                )
+            }
+            Text(
+                text = screen.label,
+                fontSize = 11.sp,
+                fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
+                color = labelColor
             )
         }
     }
