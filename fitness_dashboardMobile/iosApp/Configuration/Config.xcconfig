@@ -1,7 +1,6 @@
 TEAM_ID=
 
 PRODUCT_NAME=fitness_dashboardMobile
-PRODUCT_BUNDLE_IDENTIFIER=org.example.project.fitness_dashboardMobile$(TEAM_ID)
-
+PRODUCT_BUNDLE_IDENTIFIER=com.huzuobin.fitboard.mobile
 CURRENT_PROJECT_VERSION=1
 MARKETING_VERSION=1.0

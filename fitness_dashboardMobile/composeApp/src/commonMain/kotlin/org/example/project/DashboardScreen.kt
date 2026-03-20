@@ -306,7 +306,7 @@ private fun HealthSummaryCard() {
                 Spacer(Modifier.height(8.dp))
 
                 SummaryRow(
-                    label = "最近睡眠",
+                    label = "睡眠时长",
                     value = if (healthState.hasSleepDuration) {
                         formatSleepDuration(healthState.sleepDurationHours)
                     } else {

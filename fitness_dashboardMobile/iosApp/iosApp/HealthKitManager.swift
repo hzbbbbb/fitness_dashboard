@@ -42,7 +42,7 @@ final class HealthKitManager: ObservableObject {
         HealthBridgeKt.updateHealthLoading(message: "正在请求 Apple 健康读取权限...")
 
         let readTypes: Set<HKObjectType> = [stepType, sleepType]
-        healthStore.requestAuthorization(toShare: [], read: readTypes) { [weak self] success, error in
+        healthStore.requestAuthorization(toShare: nil, read: readTypes) { [weak self] success, error in
             DispatchQueue.main.async {
                 guard let self else { return }
 
@@ -67,11 +67,6 @@ final class HealthKitManager: ObservableObject {
             return
         }
 
-        if isAuthorizationDenied(for: stepType) || isAuthorizationDenied(for: sleepType) {
-            HealthBridgeKt.updateHealthDenied(message: "未获得 Apple 健康读取权限，请前往系统设置开启步数和睡眠读取权限。")
-            return
-        }
-
         HealthBridgeKt.updateHealthLoading(message: "正在读取今日步数和睡眠时长...")
 
         let group = DispatchGroup()
@@ -81,6 +76,7 @@ final class HealthKitManager: ObservableObject {
         var sleepHours = 0.0
         var hasSleepData = false
         var failureMessage: String?
+        var hasAuthorizationDenied = false
 
         group.enter()
         fetchTodayStepCount(for: stepType) { result in
@@ -89,7 +85,11 @@ final class HealthKitManager: ObservableObject {
                 stepCount = value
                 hasStepData = true
             case .failure(let error):
-                failureMessage = error.localizedDescription
+                if self.isAuthorizationDeniedError(error) {
+                    hasAuthorizationDenied = true
+                } else {
+                    failureMessage = error.localizedDescription
+                }
             case .noData:
                 hasStepData = false
             }
@@ -97,13 +97,17 @@ final class HealthKitManager: ObservableObject {
         }
 
         group.enter()
-        fetchRecentSleepDuration(for: sleepType) { result in
+        fetchOvernightSleepDuration(for: sleepType) { result in
             switch result {
             case .success(let value):
                 sleepHours = value
                 hasSleepData = true
             case .failure(let error):
-                failureMessage = error.localizedDescription
+                if self.isAuthorizationDeniedError(error) {
+                    hasAuthorizationDenied = true
+                } else {
+                    failureMessage = error.localizedDescription
+                }
             case .noData:
                 hasSleepData = false
             }
@@ -111,6 +115,11 @@ final class HealthKitManager: ObservableObject {
         }
 
         group.notify(queue: .main) {
+            if hasAuthorizationDenied && !hasStepData && !hasSleepData {
+                HealthBridgeKt.updateHealthDenied(message: "未获得 Apple 健康读取权限，请前往系统设置开启步数和睡眠读取权限。")
+                return
+            }
+
             if let failureMessage {
                 HealthBridgeKt.updateHealthError(message: "读取 Apple 健康数据失败：\(failureMessage)")
                 return
@@ -122,7 +131,7 @@ final class HealthKitManager: ObservableObject {
 
             let message: String
             if !hasStepData && !hasSleepData {
-                message = "Apple 健康暂无步数或睡眠数据，请检查系统授权与健康 App 中的数据记录。"
+                message = "Apple 健康暂无今日步数或睡眠数据，请检查系统授权与健康 App 中的数据记录。"
             } else {
                 message = "Apple 健康数据已更新"
             }
@@ -167,12 +176,18 @@ final class HealthKitManager: ObservableObject {
         healthStore.execute(query)
     }
 
-    private func fetchRecentSleepDuration(
+    private func fetchOvernightSleepDuration(
         for type: HKCategoryType,
         completion: @escaping (HealthFetchResult<Double>) -> Void
     ) {
         let now = Date()
-        guard let start = Calendar.current.date(byAdding: .hour, value: -36, to: now) else {
+        let calendar = Calendar.current
+        let startOfToday = calendar.startOfDay(for: now)
+
+        guard
+            let start = calendar.date(byAdding: .hour, value: -6, to: startOfToday),
+            let end = calendar.date(byAdding: .hour, value: 12, to: startOfToday)
+        else {
             completion(.noData)
             return
         }
@@ -196,20 +211,60 @@ final class HealthKitManager: ObservableObject {
                 return
             }
 
-            let totalSeconds = sleepSamples.reduce(0.0) { partialResult, sample in
-                let effectiveStart = max(sample.startDate.timeIntervalSince1970, start.timeIntervalSince1970)
-                let effectiveEnd = min(sample.endDate.timeIntervalSince1970, now.timeIntervalSince1970)
-                return partialResult + max(0.0, effectiveEnd - effectiveStart)
+            let mergedIntervals = self.mergeSleepIntervals(
+                from: sleepSamples,
+                boundedBy: start ... min(end, now)
+            )
+
+            guard !mergedIntervals.isEmpty else {
+                completion(.noData)
+                return
             }
 
-            completion(.success(totalSeconds / 3600.0))
+            let totalDuration = mergedIntervals.reduce(0.0) { partialResult, interval in
+                partialResult + interval.upperBound.timeIntervalSince(interval.lowerBound)
+            }
+
+            completion(.success(totalDuration / 3600.0))
         }
 
         healthStore.execute(query)
     }
 
-    private func isAuthorizationDenied(for type: HKObjectType) -> Bool {
-        healthStore.authorizationStatus(for: type) == .sharingDenied
+    private func mergeSleepIntervals(
+        from samples: [HKCategorySample],
+        boundedBy range: ClosedRange<Date>
+    ) -> [ClosedRange<Date>] {
+        let intervals = samples
+            .map { sample in
+                max(sample.startDate, range.lowerBound) ... min(sample.endDate, range.upperBound)
+            }
+            .filter { $0.lowerBound < $0.upperBound }
+            .sorted { $0.lowerBound < $1.lowerBound }
+
+        guard var current = intervals.first else {
+            return []
+        }
+
+        var merged: [ClosedRange<Date>] = []
+
+        for interval in intervals.dropFirst() {
+            if interval.lowerBound <= current.upperBound {
+                current = current.lowerBound ... max(current.upperBound, interval.upperBound)
+            } else {
+                merged.append(current)
+                current = interval
+            }
+        }
+
+        merged.append(current)
+        return merged
+    }
+
+    private func isAuthorizationDeniedError(_ error: Error) -> Bool {
+        let nsError = error as NSError
+        return nsError.domain == HKErrorDomain
+            && nsError.code == HKError.errorAuthorizationDenied.rawValue
     }
 
     private func isAsleepSample(_ sample: HKCategorySample) -> Bool {
