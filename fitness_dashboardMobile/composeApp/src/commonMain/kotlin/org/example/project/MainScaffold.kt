@@ -48,6 +48,7 @@ internal fun AppUiState.hasAnyRecord(): Boolean =
 
 internal enum class AppScreen(val label: String, val icon: String) {
     Home("首页", "⊡"),
+    Score("评分", "◎"),
     Records("记录", "☰"),
     Settings("设置", "⚙")
 }
@@ -79,6 +80,10 @@ fun MainScaffold() {
                     AppScreen.Home -> HomeScreen(
                         state = appState,
                         dateInfo = dateInfo,
+                        today = today
+                    )
+                    AppScreen.Score -> HealthScoreScreen(
+                        state = appState,
                         today = today
                     )
                     AppScreen.Records -> RecordsScreen(
