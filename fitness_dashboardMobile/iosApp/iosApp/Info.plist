@@ -6,5 +6,7 @@
 	<true/>
 	<key>NSHealthShareUsageDescription</key>
 	<string>FitBoard 需要读取你的步数和睡眠时长，用于在首页展示轻量健康摘要。</string>
+	<key>UILaunchStoryboardName</key>
+	<string>LaunchScreen</string>
 </dict>
 </plist>
