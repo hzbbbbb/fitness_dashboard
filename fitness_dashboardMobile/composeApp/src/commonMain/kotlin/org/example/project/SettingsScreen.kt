@@ -129,14 +129,12 @@ fun SettingsScreen(
 
         SettingsPage.Style -> SettingsSubpageScaffold(
             title = "风格设置",
-            subtitle = "主题模式与热力图颜色预设",
+            subtitle = "切换整套主题模式",
             onBack = { currentPage = SettingsPage.Home }
         ) {
             StyleSettingsSection(
                 themeMode = state.themeMode,
-                heatmapAccent = state.heatmapAccent,
-                onThemeChange = { onStateChange(state.copy(themeMode = it)) },
-                onHeatmapAccentChange = { onStateChange(state.copy(heatmapAccent = it)) }
+                onThemeChange = { onStateChange(state.copy(themeMode = it)) }
             )
         }
 
@@ -230,7 +228,7 @@ private fun SettingsHomeScreen(
 
         SettingsEntryCard(
             title = "风格设置",
-            description = "${state.themeMode.title} · ${state.heatmapAccent.title}热力图",
+            description = state.themeMode.title,
             onClick = { onNavigate(SettingsPage.Style) }
         )
         Spacer(Modifier.height(12.dp))
@@ -464,13 +462,11 @@ private fun AboutSection() {
 @Composable
 private fun StyleSettingsSection(
     themeMode: AppThemeMode,
-    heatmapAccent: HeatmapAccent,
-    onThemeChange: (AppThemeMode) -> Unit,
-    onHeatmapAccentChange: (HeatmapAccent) -> Unit
+    onThemeChange: (AppThemeMode) -> Unit
 ) {
     SettingsCard(label = "主题", title = "App 主题风格") {
         Text(
-            text = "淡绿色模式为当前默认主题，后续可继续扩展持久化。",
+            text = "切换主题即可完成整套视觉切换，热力图颜色会按主题自动适配。",
             fontSize = 13.sp,
             color = FitBoardColors.textSecondary,
             lineHeight = 20.sp
@@ -481,7 +477,7 @@ private fun StyleSettingsSection(
             AppThemeMode.entries.forEach { option ->
                 StyleOptionCard(
                     title = if (option == AppThemeMode.SoftGreen) {
-                        "${option.title}（默认）"
+                        "默认模式（当前默认）"
                     } else {
                         option.title
                     },
@@ -489,34 +485,6 @@ private fun StyleSettingsSection(
                     selected = option == themeMode,
                     swatches = previewSwatchesForTheme(option),
                     onClick = { onThemeChange(option) }
-                )
-            }
-        }
-    }
-
-    Spacer(Modifier.height(12.dp))
-
-    SettingsCard(label = "热力图", title = "热力图颜色") {
-        Text(
-            text = "切换记录格子的强调色，无记录状态仍保持低对比。",
-            fontSize = 13.sp,
-            color = FitBoardColors.textSecondary,
-            lineHeight = 20.sp
-        )
-        Spacer(Modifier.height(12.dp))
-
-        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            HeatmapAccent.entries.forEach { option ->
-                StyleOptionCard(
-                    title = if (option == HeatmapAccent.Green) {
-                        "${option.title}（默认）"
-                    } else {
-                        option.title
-                    },
-                    description = option.subtitle,
-                    selected = option == heatmapAccent,
-                    swatches = previewSwatchesForAccent(option),
-                    onClick = { onHeatmapAccentChange(option) }
                 )
             }
         }
@@ -783,28 +751,9 @@ private fun previewSwatchesForTheme(themeMode: AppThemeMode): List<Color> =
             Color(0xFFF0F4F0)
         )
         AppThemeMode.Dark -> listOf(
-            Color(0xFF111714),
-            Color(0xFF19211D),
-            Color(0xFF24342B)
-        )
-    }
-
-private fun previewSwatchesForAccent(accent: HeatmapAccent): List<Color> =
-    when (accent) {
-        HeatmapAccent.Green -> listOf(
-            Color(0xFFE8EEE4),
-            Color(0xFFBED9C1),
-            Color(0xFF6AAA7A)
-        )
-        HeatmapAccent.Blue -> listOf(
-            Color(0xFFECEFEA),
-            Color(0xFFC6DFEC),
-            Color(0xFF6FA8C7)
-        )
-        HeatmapAccent.Amber -> listOf(
-            Color(0xFFECEFEA),
-            Color(0xFFF2DEC1),
-            Color(0xFFC99861)
+            Color(0xFF080808),
+            Color(0xFF161616),
+            Color(0xFF242321)
         )
     }
 

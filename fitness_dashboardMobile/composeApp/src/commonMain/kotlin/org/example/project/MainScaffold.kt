@@ -46,7 +46,6 @@ data class AppUiState(
     val note: String = "",
     val isSaved: Boolean = false,
     val themeMode: AppThemeMode = AppThemeMode.SoftGreen,
-    val heatmapAccent: HeatmapAccent = HeatmapAccent.Green,
     val sleepGoalHours: Int = 8,
     val sleepGoalMinutes: Int = 0,
     val stepGoal: Int = 8000,
@@ -76,8 +75,7 @@ fun MainScaffold() {
     val dateInfo = remember { getDateInfo() }
 
     ProvideFitBoardPalette(
-        themeMode = appState.themeMode,
-        heatmapAccent = appState.heatmapAccent
+        themeMode = appState.themeMode
     ) {
         Box(
             modifier = Modifier

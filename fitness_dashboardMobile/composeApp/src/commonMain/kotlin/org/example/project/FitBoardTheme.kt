@@ -23,18 +23,9 @@ enum class AppThemeMode(
     val title: String,
     val subtitle: String
 ) {
-    SoftGreen("淡绿色模式", "默认主题，沿用当前浅绿与米白风格"),
-    White("白色模式", "更干净的浅色界面，层次更克制"),
-    Dark("黑色模式", "深灰与暗绿为主的安静深色风格")
-}
-
-enum class HeatmapAccent(
-    val title: String,
-    val subtitle: String
-) {
-    Green("绿色", "默认健康感绿色"),
-    Blue("蓝色", "更冷静的蓝绿色调"),
-    Amber("橙色", "柔和偏暖的记录高亮")
+    SoftGreen("默认模式", "当前淡绿色健康风，继续作为默认主题"),
+    White("白色模式", "科技简约风，更干净也更理性"),
+    Dark("黑色模式", "意式极简风，黑灰与暖白更高级")
 }
 
 internal data class FitBoardPalette(
@@ -81,8 +72,7 @@ internal data class FitBoardPalette(
 )
 
 private val defaultPalette = buildFitBoardPalette(
-    themeMode = AppThemeMode.SoftGreen,
-    heatmapAccent = HeatmapAccent.Green
+    themeMode = AppThemeMode.SoftGreen
 )
 
 private val LocalFitBoardPalette = staticCompositionLocalOf { defaultPalette }
@@ -90,10 +80,9 @@ private val LocalFitBoardPalette = staticCompositionLocalOf { defaultPalette }
 @Composable
 internal fun ProvideFitBoardPalette(
     themeMode: AppThemeMode,
-    heatmapAccent: HeatmapAccent,
     content: @Composable () -> Unit
 ) {
-    val palette = buildFitBoardPalette(themeMode = themeMode, heatmapAccent = heatmapAccent)
+    val palette = buildFitBoardPalette(themeMode = themeMode)
     CompositionLocalProvider(LocalFitBoardPalette provides palette, content = content)
 }
 
@@ -181,11 +170,8 @@ internal object FitBoardColors {
 }
 
 private fun buildFitBoardPalette(
-    themeMode: AppThemeMode,
-    heatmapAccent: HeatmapAccent
+    themeMode: AppThemeMode
 ): FitBoardPalette {
-    val accent = accentColorsFor(heatmapAccent = heatmapAccent, dark = themeMode == AppThemeMode.Dark)
-
     return when (themeMode) {
         AppThemeMode.SoftGreen -> FitBoardPalette(
             bgGradientStart = Color(0xFFF7F4EA),
@@ -202,28 +188,28 @@ private fun buildFitBoardPalette(
             inactiveCardBorder = Color(0xFFDDE4D9),
             inactiveText = Color(0xFF5F6D5F),
             badgeActiveBg = Color(0xFFDFF0E2),
-            badgeActiveText = accent.accentText,
+            badgeActiveText = Color(0xFF3E7248),
             badgeInactiveBg = Color(0xFFF1F3EE),
             badgeInactiveText = Color(0xFF879185),
             innerPanelBg = Color(0xFFF6FAF3),
             innerPanelBorder = Color(0xFFE3EADF),
-            buttonGreen = accent.primaryButton,
+            buttonGreen = Color(0xFF4A7A56),
             buttonSavedBg = Color(0xFFDFF0E2),
-            buttonSavedText = accent.accentText,
-            circleActiveBg = accent.softFill,
-            circleActiveBorder = accent.softBorder,
-            circleActiveCheck = accent.accentText,
+            buttonSavedText = Color(0xFF3E7248),
+            circleActiveBg = Color(0xFFDFF0E2),
+            circleActiveBorder = Color(0xFFB9D7BC),
+            circleActiveCheck = Color(0xFF387147),
             circleInactiveBg = Color(0xFFF7F8F3),
             circleInactiveBorder = Color(0xFFD5DDD2),
             countBadgeBg = Color(0xFFEEF6EC),
             countBadgeBorder = Color(0xFFD8E5D8),
-            countBadgeText = accent.mutedText,
+            countBadgeText = Color(0xFF52725A),
             weightSavedBadgeBg = Color(0xFFEEF6EC),
             heatCellEmpty = Color(0xFFE8EEE4),
-            heatCellToday = accent.todayFill,
-            heatCellTodayRecord = accent.todayRecord,
-            heatCellRecord = accent.recordFill,
-            heatTodayBorder = accent.recordBorder,
+            heatCellToday = Color(0xFFBED9C1),
+            heatCellTodayRecord = Color(0xFF6AAA7A),
+            heatCellRecord = Color(0xFF8EC99B),
+            heatTodayBorder = Color(0xFF8BC39A),
             navBarBg = Color(0xFFF0F4EC),
             dangerBg = Color(0xFFFFF1F0),
             dangerBorder = Color(0xFFFFCDD0),
@@ -231,188 +217,92 @@ private fun buildFitBoardPalette(
         )
 
         AppThemeMode.White -> FitBoardPalette(
-            bgGradientStart = Color(0xFFFAFAF7),
-            bgGradientEnd = Color(0xFFF4F6F3),
+            bgGradientStart = Color(0xFFF7F9FC),
+            bgGradientEnd = Color(0xFFF1F5FA),
             cardBg = Color(0xFFFFFFFF),
-            cardBorder = Color(0xFFE5E8E3),
-            textPrimary = Color(0xFF1F2721),
-            textSecondary = Color(0xFF748075),
-            textHint = Color(0xFF8C968E),
-            activeCardBg = Color(0xFFF4F8F4),
-            activeCardBorder = Color(0xFFD7E1D8),
-            activeText = Color(0xFF213A27),
+            cardBorder = Color(0xFFE1E7F0),
+            textPrimary = Color(0xFF161C24),
+            textSecondary = Color(0xFF667286),
+            textHint = Color(0xFF8A94A6),
+            activeCardBg = Color(0xFFF3F7FC),
+            activeCardBorder = Color(0xFFD6E0EC),
+            activeText = Color(0xFF223247),
             inactiveCardBg = Color(0xFFFFFFFF),
-            inactiveCardBorder = Color(0xFFE3E7E3),
-            inactiveText = Color(0xFF5F695F),
-            badgeActiveBg = Color(0xFFF0F4F0),
-            badgeActiveText = accent.accentText,
-            badgeInactiveBg = Color(0xFFF5F6F4),
-            badgeInactiveText = Color(0xFF8A938C),
-            innerPanelBg = Color(0xFFF8FAF7),
-            innerPanelBorder = Color(0xFFE7EBE5),
-            buttonGreen = accent.primaryButton,
-            buttonSavedBg = Color(0xFFF0F4F0),
-            buttonSavedText = accent.accentText,
-            circleActiveBg = accent.softFill,
-            circleActiveBorder = accent.softBorder,
-            circleActiveCheck = accent.accentText,
-            circleInactiveBg = Color(0xFFF7F8F6),
-            circleInactiveBorder = Color(0xFFDDE2DC),
-            countBadgeBg = Color(0xFFF5F7F4),
-            countBadgeBorder = Color(0xFFE1E6E0),
-            countBadgeText = accent.mutedText,
-            weightSavedBadgeBg = Color(0xFFF4F7F3),
-            heatCellEmpty = Color(0xFFECEFEA),
-            heatCellToday = accent.todayFill,
-            heatCellTodayRecord = accent.todayRecord,
-            heatCellRecord = accent.recordFill,
-            heatTodayBorder = accent.recordBorder,
-            navBarBg = Color(0xFFF4F6F3),
+            inactiveCardBorder = Color(0xFFE2E8F1),
+            inactiveText = Color(0xFF5A667A),
+            badgeActiveBg = Color(0xFFEFF4FA),
+            badgeActiveText = Color(0xFF587088),
+            badgeInactiveBg = Color(0xFFF3F6FA),
+            badgeInactiveText = Color(0xFF8994A4),
+            innerPanelBg = Color(0xFFF7F9FC),
+            innerPanelBorder = Color(0xFFE5EBF3),
+            buttonGreen = Color(0xFF5D7287),
+            buttonSavedBg = Color(0xFFEFF4FA),
+            buttonSavedText = Color(0xFF587088),
+            circleActiveBg = Color(0xFFEAF0F6),
+            circleActiveBorder = Color(0xFFCFDAE5),
+            circleActiveCheck = Color(0xFF587088),
+            circleInactiveBg = Color(0xFFF5F7FA),
+            circleInactiveBorder = Color(0xFFDCE3EC),
+            countBadgeBg = Color(0xFFF3F6FA),
+            countBadgeBorder = Color(0xFFE1E7F0),
+            countBadgeText = Color(0xFF687C90),
+            weightSavedBadgeBg = Color(0xFFF2F5FA),
+            heatCellEmpty = Color(0xFFEDF2F7),
+            heatCellToday = Color(0xFFD4E0EB),
+            heatCellTodayRecord = Color(0xFF7D97AE),
+            heatCellRecord = Color(0xFFA8BDD1),
+            heatTodayBorder = Color(0xFF90A7BC),
+            navBarBg = Color(0xFFF2F5F9),
             dangerBg = Color(0xFFFFF4F3),
             dangerBorder = Color(0xFFF3D2CF),
             dangerText = Color(0xFFC65B53)
         )
 
         AppThemeMode.Dark -> FitBoardPalette(
-            bgGradientStart = Color(0xFF111714),
-            bgGradientEnd = Color(0xFF171F1B),
-            cardBg = Color(0xFF19211D),
-            cardBorder = Color(0xFF2A3530),
-            textPrimary = Color(0xFFE7EFE7),
-            textSecondary = Color(0xFFA4B0A4),
-            textHint = Color(0xFF889487),
-            activeCardBg = Color(0xFF223028),
-            activeCardBorder = Color(0xFF33483D),
-            activeText = Color(0xFFE1F1E4),
-            inactiveCardBg = Color(0xFF1B2520),
-            inactiveCardBorder = Color(0xFF2A3530),
-            inactiveText = Color(0xFFC5D0C5),
-            badgeActiveBg = Color(0xFF24342B),
-            badgeActiveText = accent.accentText,
-            badgeInactiveBg = Color(0xFF222D27),
-            badgeInactiveText = Color(0xFFA0ACA0),
-            innerPanelBg = Color(0xFF151D19),
-            innerPanelBorder = Color(0xFF29332E),
-            buttonGreen = accent.primaryButton,
-            buttonSavedBg = Color(0xFF213028),
-            buttonSavedText = accent.accentText,
-            circleActiveBg = accent.softFill,
-            circleActiveBorder = accent.softBorder,
-            circleActiveCheck = accent.accentText,
-            circleInactiveBg = Color(0xFF202924),
-            circleInactiveBorder = Color(0xFF33403A),
-            countBadgeBg = Color(0xFF202B25),
-            countBadgeBorder = Color(0xFF313D36),
-            countBadgeText = accent.mutedText,
-            weightSavedBadgeBg = Color(0xFF202B25),
-            heatCellEmpty = Color(0xFF232E28),
-            heatCellToday = accent.todayFill,
-            heatCellTodayRecord = accent.todayRecord,
-            heatCellRecord = accent.recordFill,
-            heatTodayBorder = accent.recordBorder,
-            navBarBg = Color(0xFF141B18),
+            bgGradientStart = Color(0xFF080808),
+            bgGradientEnd = Color(0xFF121212),
+            cardBg = Color(0xFF161616),
+            cardBorder = Color(0xFF252525),
+            textPrimary = Color(0xFFF3EEE7),
+            textSecondary = Color(0xFFA9A29A),
+            textHint = Color(0xFF7D7771),
+            activeCardBg = Color(0xFF1D1D1D),
+            activeCardBorder = Color(0xFF313131),
+            activeText = Color(0xFFF8F3EC),
+            inactiveCardBg = Color(0xFF191919),
+            inactiveCardBorder = Color(0xFF272727),
+            inactiveText = Color(0xFFD0C7BD),
+            badgeActiveBg = Color(0xFF242321),
+            badgeActiveText = Color(0xFFE3D8CB),
+            badgeInactiveBg = Color(0xFF1F1F1F),
+            badgeInactiveText = Color(0xFF96908A),
+            innerPanelBg = Color(0xFF111111),
+            innerPanelBorder = Color(0xFF232323),
+            buttonGreen = Color(0xFF72675D),
+            buttonSavedBg = Color(0xFF23211E),
+            buttonSavedText = Color(0xFFE3D8CB),
+            circleActiveBg = Color(0xFF2C2926),
+            circleActiveBorder = Color(0xFF3D3935),
+            circleActiveCheck = Color(0xFFE3D8CB),
+            circleInactiveBg = Color(0xFF202020),
+            circleInactiveBorder = Color(0xFF303030),
+            countBadgeBg = Color(0xFF1E1E1E),
+            countBadgeBorder = Color(0xFF2C2C2C),
+            countBadgeText = Color(0xFFB8AEA2),
+            weightSavedBadgeBg = Color(0xFF1E1E1E),
+            heatCellEmpty = Color(0xFF262626),
+            heatCellToday = Color(0xFF322F2B),
+            heatCellTodayRecord = Color(0xFF857A70),
+            heatCellRecord = Color(0xFF5A5752),
+            heatTodayBorder = Color(0xFF8D8177),
+            navBarBg = Color(0xFF101010),
             dangerBg = Color(0xFF352322),
             dangerBorder = Color(0xFF5B3533),
             dangerText = Color(0xFFFFB4AE)
         )
     }
 }
-
-private data class HeatmapAccentColors(
-    val recordFill: Color,
-    val todayRecord: Color,
-    val todayFill: Color,
-    val recordBorder: Color,
-    val accentText: Color,
-    val mutedText: Color,
-    val primaryButton: Color,
-    val softFill: Color,
-    val softBorder: Color
-)
-
-private fun accentColorsFor(
-    heatmapAccent: HeatmapAccent,
-    dark: Boolean
-): HeatmapAccentColors =
-    when (heatmapAccent) {
-        HeatmapAccent.Green -> if (dark) {
-            HeatmapAccentColors(
-                recordFill = Color(0xFF427658),
-                todayRecord = Color(0xFF5E9A72),
-                todayFill = Color(0xFF294436),
-                recordBorder = Color(0xFF6AA57D),
-                accentText = Color(0xFFA8D8B5),
-                mutedText = Color(0xFF8BC39A),
-                primaryButton = Color(0xFF5C8A67),
-                softFill = Color(0xFF243B2E),
-                softBorder = Color(0xFF3B5B48)
-            )
-        } else {
-            HeatmapAccentColors(
-                recordFill = Color(0xFF8EC99B),
-                todayRecord = Color(0xFF6AAA7A),
-                todayFill = Color(0xFFBED9C1),
-                recordBorder = Color(0xFF8BC39A),
-                accentText = Color(0xFF3E7248),
-                mutedText = Color(0xFF52725A),
-                primaryButton = Color(0xFF4A7A56),
-                softFill = Color(0xFFDFF0E2),
-                softBorder = Color(0xFFB9D7BC)
-            )
-        }
-
-        HeatmapAccent.Blue -> if (dark) {
-            HeatmapAccentColors(
-                recordFill = Color(0xFF3A6680),
-                todayRecord = Color(0xFF4D86A6),
-                todayFill = Color(0xFF21394A),
-                recordBorder = Color(0xFF5F95B5),
-                accentText = Color(0xFFA7CCE2),
-                mutedText = Color(0xFF7FB4D2),
-                primaryButton = Color(0xFF4C7590),
-                softFill = Color(0xFF213746),
-                softBorder = Color(0xFF39586C)
-            )
-        } else {
-            HeatmapAccentColors(
-                recordFill = Color(0xFF94C3DC),
-                todayRecord = Color(0xFF6FA8C7),
-                todayFill = Color(0xFFC6DFEC),
-                recordBorder = Color(0xFF85B5D1),
-                accentText = Color(0xFF43718A),
-                mutedText = Color(0xFF4E7288),
-                primaryButton = Color(0xFF537A90),
-                softFill = Color(0xFFE1EFF6),
-                softBorder = Color(0xFFBCD3E1)
-            )
-        }
-
-        HeatmapAccent.Amber -> if (dark) {
-            HeatmapAccentColors(
-                recordFill = Color(0xFF8A6138),
-                todayRecord = Color(0xFFA87748),
-                todayFill = Color(0xFF4A3421),
-                recordBorder = Color(0xFFC08C58),
-                accentText = Color(0xFFFFD19F),
-                mutedText = Color(0xFFE2B37E),
-                primaryButton = Color(0xFF8A6A4A),
-                softFill = Color(0xFF423022),
-                softBorder = Color(0xFF5D4631)
-            )
-        } else {
-            HeatmapAccentColors(
-                recordFill = Color(0xFFE0BC8D),
-                todayRecord = Color(0xFFC99861),
-                todayFill = Color(0xFFF2DEC1),
-                recordBorder = Color(0xFFD7AA72),
-                accentText = Color(0xFF9A6836),
-                mutedText = Color(0xFF8B6948),
-                primaryButton = Color(0xFF8A6A4A),
-                softFill = Color(0xFFF6E8D4),
-                softBorder = Color(0xFFE3C8A4)
-            )
-        }
-    }
 
 @Composable
 internal fun FitCard(
