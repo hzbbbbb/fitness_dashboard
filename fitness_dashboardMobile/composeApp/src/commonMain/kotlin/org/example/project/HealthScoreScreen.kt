@@ -125,7 +125,7 @@ private fun TotalScoreCard(
         ) {
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 Text(
-                    text = "${scoreState.totalScore}",
+                    text = formatScore(scoreState.totalScore),
                     fontSize = 42.sp,
                     fontWeight = FontWeight.SemiBold,
                     color = FitBoardColors.textPrimary
@@ -192,7 +192,7 @@ private fun ScoreDimensionRow(item: HealthScoreItemState) {
                     color = FitBoardColors.textPrimary
                 )
                 Text(
-                    text = "${item.score} / ${item.maxScore}",
+                    text = "${formatScore(item.score)} / ${item.maxScore}",
                     fontSize = 14.sp,
                     fontWeight = FontWeight.SemiBold,
                     color = FitBoardColors.activeText
@@ -221,7 +221,7 @@ private fun ScoreCompositionCard(scoreState: HealthScorePageState) {
             ScoreCompositionRow(
                 label = item.label,
                 weightText = item.weightText,
-                value = "${item.score} / ${item.maxScore}"
+                value = "${formatScore(item.score)} / ${item.maxScore}"
             )
             if (index != scoreState.items.lastIndex) {
                 Spacer(Modifier.height(8.dp))
@@ -281,14 +281,14 @@ private fun ScoreTag(text: String) {
 }
 
 private data class HealthScorePageState(
-    val totalScore: Int,
+    val totalScore: Double,
     val levelLabel: String,
     val items: List<HealthScoreItemState>
 )
 
 private data class HealthScoreItemState(
     val label: String,
-    val score: Int,
+    val score: Double,
     val maxScore: Int,
     val summary: String,
     val weightText: String
@@ -298,13 +298,13 @@ private fun buildHealthScoreState(
     state: AppUiState,
     healthState: HealthSummaryUiState
 ): HealthScorePageState {
-    val sleepScore = calculateSleepScore(healthState)
-    val stepScore = calculateStepScore(healthState)
-    val trainingScore = calculateTrainingScore(state.selectedTraining)
+    val sleepScore = calculateSleepScore(healthState, state)
+    val stepScore = calculateStepScore(healthState, state)
+    val trainingScore = calculateTrainingScore(state.selectedTraining).toDouble()
     val supplementScore = calculateSupplementScore(
         checkedCount = state.checkedSupplements.size,
         totalCount = state.supplementOptions.size
-    )
+    ).toDouble()
 
     val items = listOf(
         HealthScoreItemState(
@@ -352,37 +352,36 @@ private fun buildHealthScoreState(
 
     return HealthScorePageState(
         totalScore = totalScore,
-        levelLabel = levelForScore(totalScore),
+        levelLabel = levelForScore(totalScore.roundToInt()),
         items = items
     )
 }
 
-private fun calculateSleepScore(healthState: HealthSummaryUiState): Int {
-    if (!healthState.hasSleepDuration) return 0
+private fun calculateSleepScore(
+    healthState: HealthSummaryUiState,
+    state: AppUiState
+): Double {
+    if (!healthState.hasSleepDuration) return 0.0
 
-    val hours = healthState.sleepDurationHours
-    return when {
-        hours < 5.0 -> 10
-        hours < 6.0 -> 20
-        hours < 7.0 -> 30
-        hours <= 9.0 -> 40
-        hours <= 10.0 -> 32
-        else -> 24
-    }
+    val targetMinutes = state.sleepGoalHours * 60 + state.sleepGoalMinutes
+    if (targetMinutes <= 0) return 0.0
+
+    val actualMinutes = (healthState.sleepDurationHours * 60.0).coerceAtLeast(0.0)
+    return SLEEP_MAX_SCORE * (actualMinutes / targetMinutes.toDouble()).coerceAtMost(1.0)
 }
 
-private fun calculateStepScore(healthState: HealthSummaryUiState): Int {
-    if (!healthState.hasTodaySteps) return 0
+private fun calculateStepScore(
+    healthState: HealthSummaryUiState,
+    state: AppUiState
+): Double {
+    if (!healthState.hasTodaySteps) return 0.0
 
-    val steps = healthState.todaySteps
-    return when {
-        steps < 2000 -> 5
-        steps < 4000 -> 10
-        steps < 6000 -> 15
-        steps < 8000 -> 20
-        steps <= 12000 -> 25
-        else -> 22
-    }
+    val targetSteps = state.stepGoal
+    if (targetSteps <= 0) return 0.0
+
+    return STEP_MAX_SCORE * (
+        healthState.todaySteps.toDouble() / targetSteps.toDouble()
+        ).coerceAtMost(1.0)
 }
 
 private fun calculateTrainingScore(training: String?): Int {
@@ -432,3 +431,12 @@ private fun levelForScore(score: Int): String =
         score >= 55 -> "一般"
         else -> "较差"
     }
+
+private fun formatScore(score: Double): String {
+    val rounded = (score * 10).roundToInt() / 10.0
+    return if (rounded % 1.0 == 0.0) {
+        rounded.roundToInt().toString()
+    } else {
+        rounded.toString()
+    }
+}

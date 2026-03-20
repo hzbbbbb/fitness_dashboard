@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -28,10 +29,17 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
@@ -43,94 +51,120 @@ fun RecordsScreen(
     today: String,
     onStateChange: (AppUiState) -> Unit
 ) {
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .statusBarsPadding()
-            .padding(horizontal = 16.dp)
-    ) {
-        Spacer(Modifier.height(12.dp))
-
-        Column(Modifier.padding(horizontal = 4.dp)) {
-            Text(
-                text = "今日记录",
-                fontSize = 26.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = FitBoardColors.textPrimary
-            )
-            Spacer(Modifier.height(3.dp))
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "当天录入与保存",
-                    fontSize = 14.sp,
-                    color = FitBoardColors.textSecondary
-                )
-                Text(
-                    text = today,
-                    fontSize = 13.sp,
-                    color = FitBoardColors.textHint
-                )
+    val focusManager = LocalFocusManager.current
+    val dismissKeyboardOnScroll = remember(focusManager) {
+        object : NestedScrollConnection {
+            override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
+                if (source == NestedScrollSource.UserInput && available.y != 0f) {
+                    focusManager.clearFocus(force = true)
+                }
+                return Offset.Zero
             }
         }
+    }
 
-        Spacer(Modifier.height(16.dp))
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .pointerInput(Unit) {
+                detectTapGestures(onTap = {
+                    focusManager.clearFocus(force = true)
+                })
+            }
+            .nestedScroll(dismissKeyboardOnScroll)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .statusBarsPadding()
+                .padding(horizontal = 16.dp)
+        ) {
+            Spacer(Modifier.height(12.dp))
 
-        RecordCompletenessBanner(state = state)
-        Spacer(Modifier.height(12.dp))
-
-        WeightRecordCard(
-            weightInput = state.weightInput,
-            savedWeight = state.savedWeight,
-            onWeightChange = { onStateChange(state.copy(weightInput = it, isSaved = false)) },
-            onSave = {
-                val trimmed = state.weightInput.trim()
-                if (trimmed.isNotEmpty()) {
-                    onStateChange(state.copy(savedWeight = trimmed, isSaved = false))
+            Column(Modifier.padding(horizontal = 4.dp)) {
+                Text(
+                    text = "今日记录",
+                    fontSize = 26.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = FitBoardColors.textPrimary
+                )
+                Spacer(Modifier.height(3.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "当天录入与保存",
+                        fontSize = 14.sp,
+                        color = FitBoardColors.textSecondary
+                    )
+                    Text(
+                        text = today,
+                        fontSize = 13.sp,
+                        color = FitBoardColors.textHint
+                    )
                 }
             }
-        )
-        Spacer(Modifier.height(12.dp))
 
-        TrainingRecordCard(
-            selected = state.selectedTraining,
-            options = state.trainingOptions,
-            onSelect = { option ->
-                val updated = if (state.selectedTraining == option) null else option
-                onStateChange(state.copy(selectedTraining = updated, isSaved = false))
-            }
-        )
-        Spacer(Modifier.height(12.dp))
+            Spacer(Modifier.height(16.dp))
 
-        SupplementRecordCard(
-            checked = state.checkedSupplements,
-            options = state.supplementOptions,
-            onToggle = { option ->
-                val updated = if (option in state.checkedSupplements) {
-                    state.checkedSupplements - option
-                } else {
-                    state.checkedSupplements + option
+            RecordCompletenessBanner(state = state)
+            Spacer(Modifier.height(12.dp))
+
+            WeightRecordCard(
+                weightInput = state.weightInput,
+                savedWeight = state.savedWeight,
+                onWeightChange = { onStateChange(state.copy(weightInput = it, isSaved = false)) },
+                onSave = {
+                    val trimmed = state.weightInput.trim()
+                    if (trimmed.isNotEmpty()) {
+                        onStateChange(state.copy(savedWeight = trimmed, isSaved = false))
+                    }
                 }
-                onStateChange(state.copy(checkedSupplements = updated, isSaved = false))
-            }
-        )
-        Spacer(Modifier.height(12.dp))
+            )
+            Spacer(Modifier.height(12.dp))
 
-        NotesRecordCard(
-            note = state.note,
-            onNoteChange = { onStateChange(state.copy(note = it, isSaved = false)) }
-        )
-        Spacer(Modifier.height(20.dp))
+            TrainingRecordCard(
+                selected = state.selectedTraining,
+                options = state.trainingOptions,
+                onSelect = { option ->
+                    val updated = if (state.selectedTraining == option) null else option
+                    onStateChange(state.copy(selectedTraining = updated, isSaved = false))
+                }
+            )
+            Spacer(Modifier.height(12.dp))
 
-        SaveTodayRecordButton(
-            isSaved = state.isSaved,
-            onClick = { onStateChange(state.copy(isSaved = true)) }
-        )
-        Spacer(Modifier.height(28.dp))
+            SupplementRecordCard(
+                checked = state.checkedSupplements,
+                options = state.supplementOptions,
+                onToggle = { option ->
+                    val updated = if (option in state.checkedSupplements) {
+                        state.checkedSupplements - option
+                    } else {
+                        state.checkedSupplements + option
+                    }
+                    onStateChange(state.copy(checkedSupplements = updated, isSaved = false))
+                }
+            )
+            Spacer(Modifier.height(12.dp))
+
+            NotesRecordCard(
+                note = state.note,
+                onNoteChange = { onStateChange(state.copy(note = it, isSaved = false)) }
+            )
+            Spacer(Modifier.height(20.dp))
+
+            SaveTodayRecordButton(
+                isSaved = state.isSaved,
+                onClick = {
+                    focusManager.clearFocus(force = true)
+                    onStateChange(state.copy(isSaved = true))
+                }
+            )
+            Spacer(Modifier.height(28.dp))
+        }
     }
 }
 

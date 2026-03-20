@@ -2,6 +2,7 @@ package org.example.project
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -13,6 +14,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
@@ -41,6 +44,121 @@ fun SettingsScreen(
     state: AppUiState,
     onStateChange: (AppUiState) -> Unit
 ) {
+    var currentPage by remember { mutableStateOf(SettingsPage.Home) }
+
+    when (currentPage) {
+        SettingsPage.Home -> SettingsHomeScreen(
+            state = state,
+            onNavigate = { currentPage = it }
+        )
+
+        SettingsPage.Training -> SettingsSubpageScaffold(
+            title = "训练类型设置",
+            subtitle = "管理记录页可选的训练类型",
+            onBack = { currentPage = SettingsPage.Home }
+        ) {
+            TrainingSettingsSection(
+                options = state.trainingOptions,
+                onAdd = { name ->
+                    if (name.isNotBlank() && name !in state.trainingOptions) {
+                        onStateChange(state.copy(trainingOptions = state.trainingOptions + name))
+                    }
+                },
+                onDelete = { name ->
+                    if (state.trainingOptions.size > 1) {
+                        onStateChange(
+                            state.copy(
+                                trainingOptions = state.trainingOptions - name,
+                                selectedTraining = if (state.selectedTraining == name) null else state.selectedTraining
+                            )
+                        )
+                    }
+                }
+            )
+        }
+
+        SettingsPage.Supplement -> SettingsSubpageScaffold(
+            title = "补剂类型设置",
+            subtitle = "管理记录页可选的补剂类型",
+            onBack = { currentPage = SettingsPage.Home }
+        ) {
+            SupplementSettingsSection(
+                options = state.supplementOptions,
+                onAdd = { name ->
+                    if (name.isNotBlank() && name !in state.supplementOptions) {
+                        onStateChange(state.copy(supplementOptions = state.supplementOptions + name))
+                    }
+                },
+                onDelete = { name ->
+                    if (state.supplementOptions.size > 1) {
+                        onStateChange(
+                            state.copy(
+                                supplementOptions = state.supplementOptions - name,
+                                checkedSupplements = state.checkedSupplements - name
+                            )
+                        )
+                    }
+                }
+            )
+        }
+
+        SettingsPage.SleepGoal -> SettingsSubpageScaffold(
+            title = "睡眠目标设置",
+            subtitle = "使用预设时长作为评分目标",
+            onBack = { currentPage = SettingsPage.Home }
+        ) {
+            SleepGoalSettingsCard(
+                selectedHour = state.sleepGoalHours,
+                selectedMinute = state.sleepGoalMinutes,
+                onSelectHour = { onStateChange(state.copy(sleepGoalHours = it)) },
+                onSelectMinute = { onStateChange(state.copy(sleepGoalMinutes = it)) }
+            )
+        }
+
+        SettingsPage.StepGoal -> SettingsSubpageScaffold(
+            title = "步数目标设置",
+            subtitle = "使用预设步数作为评分目标",
+            onBack = { currentPage = SettingsPage.Home }
+        ) {
+            StepGoalSettingsCard(
+                selectedStepGoal = state.stepGoal,
+                onSelectStepGoal = { onStateChange(state.copy(stepGoal = it)) }
+            )
+        }
+
+        SettingsPage.LocalData -> SettingsSubpageScaffold(
+            title = "本地数据导入与导出",
+            subtitle = "当前仅提供入口和占位说明",
+            onBack = { currentPage = SettingsPage.Home }
+        ) {
+            LocalDataSection()
+        }
+
+        SettingsPage.About -> SettingsSubpageScaffold(
+            title = "关于应用",
+            subtitle = "应用信息与当前定位",
+            onBack = { currentPage = SettingsPage.Home }
+        ) {
+            AboutSection()
+        }
+    }
+}
+
+private enum class SettingsPage {
+    Home,
+    Training,
+    Supplement,
+    SleepGoal,
+    StepGoal,
+    LocalData,
+    About
+}
+
+@Composable
+private fun SettingsHomeScreen(
+    state: AppUiState,
+    onNavigate: (SettingsPage) -> Unit
+) {
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -59,7 +177,7 @@ fun SettingsScreen(
             )
             Spacer(Modifier.height(3.dp))
             Text(
-                text = "训练、补剂与本地数据说明",
+                text = "目标、类型与本地说明",
                 fontSize = 14.sp,
                 color = FitBoardColors.textSecondary
             )
@@ -67,54 +185,91 @@ fun SettingsScreen(
 
         Spacer(Modifier.height(20.dp))
 
-        TrainingSettingsSection(
-            options = state.trainingOptions,
-            onAdd = { name ->
-                if (name.isNotBlank() && name !in state.trainingOptions) {
-                    onStateChange(state.copy(trainingOptions = state.trainingOptions + name))
-                }
-            },
-            onDelete = { name ->
-                if (state.trainingOptions.size > 1) {
-                    onStateChange(
-                        state.copy(
-                            trainingOptions = state.trainingOptions - name,
-                            selectedTraining = if (state.selectedTraining == name) null else state.selectedTraining
-                        )
-                    )
-                }
-            }
+        SettingsEntryCard(
+            title = "训练类型设置",
+            description = "管理记录页的训练选项",
+            onClick = { onNavigate(SettingsPage.Training) }
+        )
+        Spacer(Modifier.height(12.dp))
+
+        SettingsEntryCard(
+            title = "补剂类型设置",
+            description = "管理记录页的补剂选项",
+            onClick = { onNavigate(SettingsPage.Supplement) }
+        )
+        Spacer(Modifier.height(12.dp))
+
+        SettingsEntryCard(
+            title = "睡眠目标设置",
+            description = formatSleepGoal(state.sleepGoalHours, state.sleepGoalMinutes),
+            onClick = { onNavigate(SettingsPage.SleepGoal) }
+        )
+        Spacer(Modifier.height(12.dp))
+
+        SettingsEntryCard(
+            title = "步数目标设置",
+            description = "${state.stepGoal}步",
+            onClick = { onNavigate(SettingsPage.StepGoal) }
+        )
+        Spacer(Modifier.height(12.dp))
+
+        SettingsEntryCard(
+            title = "本地数据导入与导出",
+            description = "入口已预留，功能暂未开放",
+            onClick = { onNavigate(SettingsPage.LocalData) }
+        )
+        Spacer(Modifier.height(12.dp))
+
+        SettingsEntryCard(
+            title = "关于应用",
+            description = "查看应用信息与当前定位",
+            onClick = { onNavigate(SettingsPage.About) }
         )
 
+        Spacer(Modifier.height(28.dp))
+    }
+}
+
+@Composable
+private fun SettingsSubpageScaffold(
+    title: String,
+    subtitle: String,
+    onBack: () -> Unit,
+    content: @Composable () -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .statusBarsPadding()
+            .padding(horizontal = 16.dp)
+    ) {
         Spacer(Modifier.height(12.dp))
 
-        SupplementSettingsSection(
-            options = state.supplementOptions,
-            onAdd = { name ->
-                if (name.isNotBlank() && name !in state.supplementOptions) {
-                    onStateChange(state.copy(supplementOptions = state.supplementOptions + name))
-                }
-            },
-            onDelete = { name ->
-                if (state.supplementOptions.size > 1) {
-                    onStateChange(
-                        state.copy(
-                            supplementOptions = state.supplementOptions - name,
-                            checkedSupplements = state.checkedSupplements - name
-                        )
-                    )
-                }
-            }
-        )
+        Column(Modifier.padding(horizontal = 4.dp)) {
+            Text(
+                text = "‹ 返回",
+                fontSize = 13.sp,
+                color = FitBoardColors.badgeActiveText,
+                modifier = Modifier.clickable { onBack() }
+            )
+            Spacer(Modifier.height(10.dp))
+            Text(
+                text = title,
+                fontSize = 26.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = FitBoardColors.textPrimary
+            )
+            Spacer(Modifier.height(3.dp))
+            Text(
+                text = subtitle,
+                fontSize = 14.sp,
+                color = FitBoardColors.textSecondary
+            )
+        }
 
-        Spacer(Modifier.height(12.dp))
-
-        LocalDataSection()
-
-        Spacer(Modifier.height(12.dp))
-
-        AboutSection()
-
+        Spacer(Modifier.height(20.dp))
+        content()
         Spacer(Modifier.height(28.dp))
     }
 }
@@ -247,11 +402,187 @@ private fun AboutSection() {
         Spacer(Modifier.height(8.dp))
         AboutRow(key = "当前定位", value = "轻量健康记录助手")
         Spacer(Modifier.height(8.dp))
-        AboutRow(key = "界面职责", value = "首页概览 / 记录录入 / 设置配置")
+        AboutRow(key = "界面职责", value = "首页概览 / 健康评分 / 记录录入 / 设置配置")
         Spacer(Modifier.height(8.dp))
         AboutRow(key = "技术实现", value = "Compose Multiplatform")
     }
 }
+
+@Composable
+private fun SleepGoalSettingsCard(
+    selectedHour: Int,
+    selectedMinute: Int,
+    onSelectHour: (Int) -> Unit,
+    onSelectMinute: (Int) -> Unit
+) {
+    SettingsCard(label = "睡眠目标", title = "目标时长") {
+        Text(
+            text = "使用预设滚动选择设置睡眠目标。",
+            fontSize = 13.sp,
+            color = FitBoardColors.textSecondary,
+            lineHeight = 20.sp
+        )
+        Spacer(Modifier.height(12.dp))
+
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            GoalPickerColumn(
+                title = "小时",
+                selectedValue = selectedHour,
+                options = (4..12).toList(),
+                optionLabel = { "${it}小时" },
+                onSelect = onSelectHour,
+                modifier = Modifier.weight(1f)
+            )
+            GoalPickerColumn(
+                title = "分钟",
+                selectedValue = selectedMinute,
+                options = listOf(0, 15, 30, 45),
+                optionLabel = { "${it}分" },
+                onSelect = onSelectMinute,
+                modifier = Modifier.weight(1f)
+            )
+        }
+
+        Spacer(Modifier.height(12.dp))
+        EmptyHint("当前目标：${formatSleepGoal(selectedHour, selectedMinute)}")
+    }
+}
+
+@Composable
+private fun StepGoalSettingsCard(
+    selectedStepGoal: Int,
+    onSelectStepGoal: (Int) -> Unit
+) {
+    SettingsCard(label = "步数目标", title = "目标步数") {
+        Text(
+            text = "使用预设滚动选择设置步数目标。",
+            fontSize = 13.sp,
+            color = FitBoardColors.textSecondary,
+            lineHeight = 20.sp
+        )
+        Spacer(Modifier.height(12.dp))
+
+        GoalPickerColumn(
+            title = "步数",
+            selectedValue = selectedStepGoal,
+            options = (1..30).map { it * 1000 },
+            optionLabel = { "${it}步" },
+            onSelect = onSelectStepGoal,
+            modifier = Modifier.fillMaxWidth()
+        )
+
+        Spacer(Modifier.height(12.dp))
+        EmptyHint("当前目标：${selectedStepGoal}步")
+    }
+}
+
+@Composable
+private fun <T> GoalPickerColumn(
+    title: String,
+    selectedValue: T,
+    options: List<T>,
+    optionLabel: (T) -> String,
+    onSelect: (T) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier
+            .clip(RoundedCornerShape(16.dp))
+            .border(1.dp, FitBoardColors.innerPanelBorder, RoundedCornerShape(16.dp))
+            .background(FitBoardColors.innerPanelBg)
+            .padding(10.dp)
+    ) {
+        Text(
+            text = title,
+            fontSize = 12.sp,
+            color = FitBoardColors.textSecondary
+        )
+        Spacer(Modifier.height(8.dp))
+
+        LazyColumn(
+            modifier = Modifier.height(220.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            items(options) { option ->
+                val selected = option == selectedValue
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
+                        .border(
+                            1.dp,
+                            if (selected) FitBoardColors.activeCardBorder else FitBoardColors.inactiveCardBorder,
+                            RoundedCornerShape(12.dp)
+                        )
+                        .background(if (selected) FitBoardColors.activeCardBg else FitBoardColors.inactiveCardBg)
+                        .clickable { onSelect(option) }
+                        .padding(horizontal = 12.dp, vertical = 12.dp)
+                ) {
+                    Text(
+                        text = optionLabel(option),
+                        fontSize = 14.sp,
+                        fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+                        color = if (selected) FitBoardColors.activeText else FitBoardColors.textPrimary
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SettingsEntryCard(
+    title: String,
+    description: String,
+    onClick: () -> Unit
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(18.dp))
+            .border(1.dp, FitBoardColors.cardBorder, RoundedCornerShape(18.dp))
+            .background(FitBoardColors.cardBg)
+            .clickable { onClick() }
+            .padding(horizontal = 16.dp, vertical = 16.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                Text(
+                    text = title,
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = FitBoardColors.textPrimary
+                )
+                Text(
+                    text = description,
+                    fontSize = 12.sp,
+                    color = FitBoardColors.textHint,
+                    lineHeight = 18.sp
+                )
+            }
+            Spacer(Modifier.width(10.dp))
+            Text(
+                text = "›",
+                fontSize = 18.sp,
+                color = FitBoardColors.textHint
+            )
+        }
+    }
+}
+
+private fun formatSleepGoal(hour: Int, minute: Int): String =
+    if (minute == 0) {
+        "${hour}小时"
+    } else {
+        "${hour}小时${minute}分"
+    }
 
 @Composable
 private fun SettingsCard(

@@ -37,6 +37,9 @@ data class AppUiState(
     val checkedSupplements: Set<String> = emptySet(),
     val note: String = "",
     val isSaved: Boolean = false,
+    val sleepGoalHours: Int = 8,
+    val sleepGoalMinutes: Int = 0,
+    val stepGoal: Int = 8000,
     val trainingOptions: List<String> = DEFAULT_TRAINING_OPTIONS,
     val supplementOptions: List<String> = DEFAULT_SUPPLEMENT_OPTIONS
 )
