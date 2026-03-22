@@ -1,0 +1,168 @@
+package org.example.project
+
+import android.content.Context
+import org.json.JSONArray
+import org.json.JSONObject
+import java.io.File
+
+internal object FitBoardAndroidContextHolder {
+    lateinit var appContext: Context
+        private set
+
+    fun initialize(context: Context) {
+        appContext = context.applicationContext
+    }
+}
+
+internal actual object FitBoardFileStorePlatform {
+    actual fun loadOrCreateConfig(defaultConfig: StoredAppConfig): StoredAppConfig {
+        val file = resolveFile(FIT_BOARD_CONFIG_PATH)
+        ensureParentDirectory(file)
+
+        if (!file.exists()) {
+            saveConfig(defaultConfig)
+            return defaultConfig
+        }
+
+        return runCatching {
+            parseConfig(JSONObject(file.readText()))
+        }.getOrElse {
+            saveConfig(defaultConfig)
+            defaultConfig
+        }
+    }
+
+    actual fun saveConfig(config: StoredAppConfig): Boolean {
+        val file = resolveFile(FIT_BOARD_CONFIG_PATH)
+        ensureParentDirectory(file)
+        return runCatching {
+            file.writeText(config.toJson().toString(2))
+        }.isSuccess
+    }
+
+    actual fun loadOrCreateDailyRecord(defaultRecord: StoredDailyRecord): StoredDailyRecord {
+        val file = resolveFile(recordPath(defaultRecord.date))
+        ensureParentDirectory(file)
+
+        if (!file.exists()) {
+            saveDailyRecord(defaultRecord)
+            return defaultRecord
+        }
+
+        return runCatching {
+            parseDailyRecord(JSONObject(file.readText()), defaultRecord.date)
+        }.getOrElse {
+            saveDailyRecord(defaultRecord)
+            defaultRecord
+        }
+    }
+
+    actual fun saveDailyRecord(record: StoredDailyRecord): Boolean {
+        val file = resolveFile(recordPath(record.date))
+        ensureParentDirectory(file)
+        return runCatching {
+            file.writeText(record.toJson().toString(2))
+        }.isSuccess
+    }
+
+    private fun resolveFile(relativePath: String): File {
+        return File(FitBoardAndroidContextHolder.appContext.filesDir, relativePath)
+    }
+
+    private fun ensureParentDirectory(file: File) {
+        file.parentFile?.mkdirs()
+    }
+
+    private fun parseConfig(json: JSONObject): StoredAppConfig {
+        return StoredAppConfig(
+            schemaVersion = json.optInt("schemaVersion", 1),
+            themeMode = json.optString("themeMode", AppThemeMode.SoftGreen.name),
+            sleepGoalMinutes = json.optInt("sleepGoalMinutes", 8 * 60),
+            stepGoal = json.optInt("stepGoal", 8000),
+            trainingOptions = json.optStringList("trainingOptions"),
+            supplementOptions = json.optStringList("supplementOptions")
+        )
+    }
+
+    private fun parseDailyRecord(json: JSONObject, fallbackDate: String): StoredDailyRecord {
+        val healthJson = json.optJSONObject("healthSummary")
+        return StoredDailyRecord(
+            schemaVersion = json.optInt("schemaVersion", 1),
+            date = json.optString("date", fallbackDate),
+            weight = json.optStringOrNull("weight"),
+            selectedTraining = json.optStringOrNull("selectedTraining"),
+            selectedSupplements = json.optStringList("selectedSupplements"),
+            note = json.optString("note", ""),
+            isSaved = json.optBoolean("isSaved", false),
+            healthSummary = StoredHealthSummary(
+                authorizationState = healthJson?.optString(
+                    "authorizationState",
+                    HealthAuthorizationState.Idle.name
+                ) ?: HealthAuthorizationState.Idle.name,
+                statusMessage = healthJson?.optString("statusMessage", "等待 Apple 健康授权")
+                    ?: "等待 Apple 健康授权",
+                todaySteps = healthJson?.optInt("todaySteps", 0) ?: 0,
+                hasTodaySteps = healthJson?.optBoolean("hasTodaySteps", false) ?: false,
+                sleepDurationHours = healthJson?.optDouble("sleepDurationHours", 0.0) ?: 0.0,
+                hasSleepDuration = healthJson?.optBoolean("hasSleepDuration", false) ?: false,
+                lastUpdatedAt = healthJson?.optString("lastUpdatedAt", "") ?: ""
+            )
+        )
+    }
+}
+
+private fun StoredAppConfig.toJson(): JSONObject {
+    return JSONObject().apply {
+        put("schemaVersion", schemaVersion)
+        put("themeMode", themeMode)
+        put("sleepGoalMinutes", sleepGoalMinutes)
+        put("stepGoal", stepGoal)
+        put("trainingOptions", JSONArray(trainingOptions))
+        put("supplementOptions", JSONArray(supplementOptions))
+    }
+}
+
+private fun StoredDailyRecord.toJson(): JSONObject {
+    return JSONObject().apply {
+        put("schemaVersion", schemaVersion)
+        put("date", date)
+        put("weight", weight)
+        put("selectedTraining", selectedTraining)
+        put("selectedSupplements", JSONArray(selectedSupplements))
+        put("note", note)
+        put("isSaved", isSaved)
+        put(
+            "healthSummary",
+            JSONObject().apply {
+                put("authorizationState", healthSummary.authorizationState)
+                put("statusMessage", healthSummary.statusMessage)
+                put("todaySteps", healthSummary.todaySteps)
+                put("hasTodaySteps", healthSummary.hasTodaySteps)
+                put("sleepDurationHours", healthSummary.sleepDurationHours)
+                put("hasSleepDuration", healthSummary.hasSleepDuration)
+                put("lastUpdatedAt", healthSummary.lastUpdatedAt)
+            }
+        )
+    }
+}
+
+private fun JSONObject.optStringList(key: String): List<String> {
+    val jsonArray = optJSONArray(key) ?: return emptyList()
+    return buildList {
+        for (index in 0 until jsonArray.length()) {
+            val value = jsonArray.optString(index).trim()
+            if (value.isNotEmpty()) {
+                add(value)
+            }
+        }
+    }
+}
+
+private fun JSONObject.optStringOrNull(key: String): String? {
+    if (!has(key) || isNull(key)) {
+        return null
+    }
+    return optString(key).trim().takeIf { it.isNotEmpty() }
+}
+
+private fun recordPath(date: String): String = "$FIT_BOARD_RECORDS_DIR/$date.json"

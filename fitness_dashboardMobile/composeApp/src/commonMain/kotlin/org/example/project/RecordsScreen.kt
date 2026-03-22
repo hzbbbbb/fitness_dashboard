@@ -49,7 +49,8 @@ import androidx.compose.ui.unit.sp
 fun RecordsScreen(
     state: AppUiState,
     today: String,
-    onStateChange: (AppUiState) -> Unit
+    onStateChange: (AppUiState) -> Unit,
+    onSaveTodayRecord: () -> Unit
 ) {
     val focusManager = LocalFocusManager.current
     val dismissKeyboardOnScroll = remember(focusManager) {
@@ -160,7 +161,7 @@ fun RecordsScreen(
                 isSaved = state.isSaved,
                 onClick = {
                     focusManager.clearFocus(force = true)
-                    onStateChange(state.copy(isSaved = true))
+                    onSaveTodayRecord()
                 }
             )
             Spacer(Modifier.height(28.dp))

@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -54,7 +55,7 @@ data class AppUiState(
 )
 
 internal fun AppUiState.hasAnyRecord(): Boolean =
-    selectedTraining != null || checkedSupplements.isNotEmpty() || savedWeight != null
+    selectedTraining != null || checkedSupplements.isNotEmpty() || savedWeight != null || note.isNotBlank()
 
 // ─── Screen Enum ───────────────────────────────────────────────────────────────
 
@@ -71,8 +72,53 @@ internal enum class AppScreen(val label: String, val icon: String) {
 fun MainScaffold() {
     var currentScreen by remember { mutableStateOf(AppScreen.Home) }
     var appState by remember { mutableStateOf(AppUiState()) }
-    val today = remember { getCurrentDate() }
     val dateInfo = remember { getDateInfo() }
+    val today = remember { getCurrentDate() }
+    val todayKey = remember(dateInfo) { storageDateKey(dateInfo) }
+    val healthSummaryState = currentHealthSummaryState()
+    var hasLoadedPersistence by remember { mutableStateOf(false) }
+
+    LaunchedEffect(todayKey) {
+        val snapshot = FitBoardFileStore.loadAppSnapshot(todayKey)
+        appState = snapshot.appState
+        HealthSummaryBridge.update(snapshot.healthSummary)
+        hasLoadedPersistence = true
+    }
+
+    LaunchedEffect(
+        hasLoadedPersistence,
+        appState.themeMode,
+        appState.sleepGoalHours,
+        appState.sleepGoalMinutes,
+        appState.stepGoal,
+        appState.trainingOptions,
+        appState.supplementOptions
+    ) {
+        if (hasLoadedPersistence) {
+            FitBoardFileStore.saveConfig(appState)
+        }
+    }
+
+    LaunchedEffect(
+        hasLoadedPersistence,
+        todayKey,
+        appState.isSaved,
+        healthSummaryState.authorizationState,
+        healthSummaryState.statusMessage,
+        healthSummaryState.todaySteps,
+        healthSummaryState.hasTodaySteps,
+        healthSummaryState.sleepDurationHours,
+        healthSummaryState.hasSleepDuration,
+        healthSummaryState.lastUpdatedAt
+    ) {
+        if (hasLoadedPersistence && appState.isSaved) {
+            FitBoardFileStore.saveTodayRecord(
+                todayKey = todayKey,
+                state = appState,
+                healthSummary = healthSummaryState
+            )
+        }
+    }
 
     ProvideFitBoardPalette(
         themeMode = appState.themeMode
@@ -104,7 +150,26 @@ fun MainScaffold() {
                         AppScreen.Records -> RecordsScreen(
                             state = appState,
                             today = today,
-                            onStateChange = { appState = it }
+                            onStateChange = { appState = it },
+                            onSaveTodayRecord = {
+                                val normalizedWeight = appState.weightInput.trim()
+                                    .takeIf { it.isNotEmpty() }
+                                    ?: appState.savedWeight
+
+                                val stateToSave = appState.copy(
+                                    weightInput = normalizedWeight.orEmpty(),
+                                    savedWeight = normalizedWeight,
+                                    isSaved = true
+                                )
+
+                                val didSave = FitBoardFileStore.saveTodayRecord(
+                                    todayKey = todayKey,
+                                    state = stateToSave,
+                                    healthSummary = healthSummaryState
+                                )
+
+                                appState = stateToSave.copy(isSaved = didSave)
+                            }
                         )
                         AppScreen.Settings -> SettingsScreen(
                             state = appState,
