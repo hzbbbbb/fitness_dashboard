@@ -105,7 +105,8 @@ private fun parseConfig(json: Map<*, *>): StoredAppConfig {
         sleepGoalMinutes = json.intValue("sleepGoalMinutes", 8 * 60),
         stepGoal = json.intValue("stepGoal", 8000),
         trainingOptions = json.stringList("trainingOptions"),
-        supplementOptions = json.stringList("supplementOptions")
+        supplementOptions = json.stringList("supplementOptions"),
+        homeVisibleCards = json.stringList("homeVisibleCards")
     )
 }
 
@@ -142,7 +143,8 @@ private fun StoredAppConfig.toJsonObject(): Map<String, Any?> {
         "sleepGoalMinutes" to sleepGoalMinutes,
         "stepGoal" to stepGoal,
         "trainingOptions" to trainingOptions,
-        "supplementOptions" to supplementOptions
+        "supplementOptions" to supplementOptions,
+        "homeVisibleCards" to homeVisibleCards
     )
 }
 

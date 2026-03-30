@@ -423,7 +423,7 @@ internal fun SupplementSettingsSection(
 private fun LocalDataSection() {
     SettingsCard(label = "说明", title = "本地数据与导入导出") {
         Text(
-            text = "当前记录只保存在本地页面状态中，退出应用后会重置。后续版本再补持久化、导入和导出能力。",
+            text = "当前设置与每日记录已落到本地文件。导入与导出入口先保留占位，后续再继续补齐。",
             fontSize = 13.sp,
             color = FitBoardColors.textSecondary,
             lineHeight = 20.sp
@@ -466,7 +466,7 @@ private fun StyleSettingsSection(
 ) {
     SettingsCard(label = "主题", title = "App 主题风格") {
         Text(
-            text = "切换主题即可完成整套视觉切换，热力图颜色会按主题自动适配。",
+            text = "默认模式已调整为更白、更轻的系统级健康摘要风格，其他主题继续作为备选。",
             fontSize = 13.sp,
             color = FitBoardColors.textSecondary,
             lineHeight = 20.sp
@@ -741,9 +741,9 @@ private fun StyleOptionCard(
 private fun previewSwatchesForTheme(themeMode: AppThemeMode): List<Color> =
     when (themeMode) {
         AppThemeMode.SoftGreen -> listOf(
-            Color(0xFFF7F4EA),
-            Color(0xFFF9FBF6),
-            Color(0xFFDFF0E2)
+            Color(0xFFFCFCFD),
+            Color(0xFFFFFFFF),
+            Color(0xFFF3F3F5)
         )
         AppThemeMode.White -> listOf(
             Color(0xFFFAFAF7),
@@ -803,9 +803,9 @@ private fun AddInputRow(
             shape = RoundedCornerShape(14.dp),
             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
             colors = OutlinedTextFieldDefaults.colors(
-                focusedBorderColor = Color(0xFFBED9C1),
+                focusedBorderColor = FitBoardColors.activeCardBorder,
                 unfocusedBorderColor = FitBoardColors.inactiveCardBorder,
-                focusedContainerColor = Color(0xFFFBFCF8),
+                focusedContainerColor = FitBoardColors.cardBg,
                 unfocusedContainerColor = FitBoardColors.inactiveCardBg,
                 cursorColor = FitBoardColors.textPrimary,
                 focusedTextColor = FitBoardColors.textPrimary,
@@ -816,8 +816,8 @@ private fun AddInputRow(
             onClick = onAdd,
             shape = RoundedCornerShape(14.dp),
             colors = ButtonDefaults.buttonColors(
-                containerColor = FitBoardColors.activeCardBg,
-                contentColor = FitBoardColors.badgeActiveText,
+                containerColor = FitBoardColors.buttonGreen,
+                contentColor = Color.White,
             ),
             elevation = ButtonDefaults.buttonElevation(0.dp)
         ) {

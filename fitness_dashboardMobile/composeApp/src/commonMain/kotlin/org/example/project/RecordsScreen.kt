@@ -181,7 +181,7 @@ private fun RecordCompletenessBanner(state: AppUiState) {
     val isComplete = filledCount == totalCount
     val pct = (filledCount * 100) / totalCount
 
-    val bgColor = if (isComplete) FitBoardColors.activeCardBg else Color(0xFFF5F7F2)
+    val bgColor = if (isComplete) FitBoardColors.activeCardBg else FitBoardColors.innerPanelBg
     val borderColor = if (isComplete) FitBoardColors.activeCardBorder else FitBoardColors.cardBorder
     val dotColor = if (isComplete) FitBoardColors.badgeActiveText else FitBoardColors.badgeInactiveText
 
@@ -254,9 +254,9 @@ internal fun WeightRecordCard(
                 shape = RoundedCornerShape(14.dp),
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                 colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = Color(0xFFBED9C1),
+                    focusedBorderColor = FitBoardColors.activeCardBorder,
                     unfocusedBorderColor = FitBoardColors.inactiveCardBorder,
-                    focusedContainerColor = Color(0xFFFBFCF8),
+                    focusedContainerColor = FitBoardColors.cardBg,
                     unfocusedContainerColor = FitBoardColors.inactiveCardBg,
                     cursorColor = FitBoardColors.textPrimary,
                     focusedTextColor = FitBoardColors.textPrimary,
@@ -495,9 +495,9 @@ internal fun NotesRecordCard(note: String, onNoteChange: (String) -> Unit) {
             },
             shape = RoundedCornerShape(16.dp),
             colors = OutlinedTextFieldDefaults.colors(
-                focusedBorderColor = Color(0xFFBED9C1),
+                focusedBorderColor = FitBoardColors.activeCardBorder,
                 unfocusedBorderColor = FitBoardColors.inactiveCardBorder,
-                focusedContainerColor = Color(0xFFFBFCF8),
+                focusedContainerColor = FitBoardColors.cardBg,
                 unfocusedContainerColor = FitBoardColors.inactiveCardBg,
                 cursorColor = FitBoardColors.textPrimary,
                 focusedTextColor = FitBoardColors.textPrimary,

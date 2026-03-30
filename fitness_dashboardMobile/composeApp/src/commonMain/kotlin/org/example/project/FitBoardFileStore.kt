@@ -11,7 +11,8 @@ internal data class StoredAppConfig(
     val sleepGoalMinutes: Int = 8 * 60,
     val stepGoal: Int = 8000,
     val trainingOptions: List<String> = DEFAULT_TRAINING_OPTIONS,
-    val supplementOptions: List<String> = DEFAULT_SUPPLEMENT_OPTIONS
+    val supplementOptions: List<String> = DEFAULT_SUPPLEMENT_OPTIONS,
+    val homeVisibleCards: List<String> = HomeSummaryCard.entries.map(HomeSummaryCard::name)
 )
 
 internal data class StoredHealthSummary(
@@ -97,7 +98,8 @@ private fun StoredAppConfig.sanitize(): StoredAppConfig {
         sleepGoalMinutes = sleepGoalMinutes.coerceIn(0, 24 * 60),
         stepGoal = stepGoal.coerceAtLeast(0),
         trainingOptions = sanitizeOptions(trainingOptions, DEFAULT_TRAINING_OPTIONS),
-        supplementOptions = sanitizeOptions(supplementOptions, DEFAULT_SUPPLEMENT_OPTIONS)
+        supplementOptions = sanitizeOptions(supplementOptions, DEFAULT_SUPPLEMENT_OPTIONS),
+        homeVisibleCards = sanitizeHomeVisibleCards(homeVisibleCards)
     )
 }
 
@@ -131,7 +133,8 @@ private fun AppUiState.toStoredConfig(): StoredAppConfig {
         sleepGoalMinutes = sleepGoalHours * 60 + sleepGoalMinutes,
         stepGoal = stepGoal,
         trainingOptions = sanitizeOptions(trainingOptions, DEFAULT_TRAINING_OPTIONS),
-        supplementOptions = sanitizeOptions(supplementOptions, DEFAULT_SUPPLEMENT_OPTIONS)
+        supplementOptions = sanitizeOptions(supplementOptions, DEFAULT_SUPPLEMENT_OPTIONS),
+        homeVisibleCards = homeCardsInDisplayOrder().map(HomeSummaryCard::name)
     )
 }
 
@@ -166,7 +169,8 @@ private fun StoredDailyRecord.toAppUiState(config: StoredAppConfig): AppUiState 
         sleepGoalMinutes = sleepGoalMinutes,
         stepGoal = config.stepGoal,
         trainingOptions = config.trainingOptions,
-        supplementOptions = config.supplementOptions
+        supplementOptions = config.supplementOptions,
+        homeVisibleCards = parseHomeVisibleCards(config.homeVisibleCards)
     )
 }
 
@@ -210,4 +214,19 @@ private fun parseThemeMode(name: String): AppThemeMode {
 private fun parseAuthorizationState(name: String): HealthAuthorizationState {
     return HealthAuthorizationState.entries.firstOrNull { it.name == name }
         ?: HealthAuthorizationState.Idle
+}
+
+private fun sanitizeHomeVisibleCards(values: List<String>): List<String> {
+    val parsed = parseHomeVisibleCards(values)
+    return if (parsed.isEmpty()) {
+        emptyList()
+    } else {
+        HomeSummaryCard.entries.filter { it in parsed }.map(HomeSummaryCard::name)
+    }
+}
+
+private fun parseHomeVisibleCards(values: List<String>): Set<HomeSummaryCard> {
+    return values.mapNotNull { name ->
+        HomeSummaryCard.entries.firstOrNull { it.name == name }
+    }.toSet()
 }

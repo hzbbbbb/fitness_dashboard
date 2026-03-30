@@ -80,7 +80,8 @@ internal actual object FitBoardFileStorePlatform {
             sleepGoalMinutes = json.optInt("sleepGoalMinutes", 8 * 60),
             stepGoal = json.optInt("stepGoal", 8000),
             trainingOptions = json.optStringList("trainingOptions"),
-            supplementOptions = json.optStringList("supplementOptions")
+            supplementOptions = json.optStringList("supplementOptions"),
+            homeVisibleCards = json.optStringList("homeVisibleCards")
         )
     }
 
@@ -119,6 +120,7 @@ private fun StoredAppConfig.toJson(): JSONObject {
         put("stepGoal", stepGoal)
         put("trainingOptions", JSONArray(trainingOptions))
         put("supplementOptions", JSONArray(supplementOptions))
+        put("homeVisibleCards", JSONArray(homeVisibleCards))
     }
 }
 

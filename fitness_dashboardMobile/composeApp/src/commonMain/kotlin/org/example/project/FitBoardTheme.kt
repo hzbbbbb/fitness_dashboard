@@ -23,7 +23,7 @@ enum class AppThemeMode(
     val title: String,
     val subtitle: String
 ) {
-    SoftGreen("默认模式", "当前淡绿色健康风，继续作为默认主题"),
+    SoftGreen("默认模式", "白底、黑字、浅灰分层，更接近系统级健康摘要"),
     White("白色模式", "科技简约风，更干净也更理性"),
     Dark("黑色模式", "意式极简风，黑灰与暖白更高级")
 }
@@ -174,46 +174,46 @@ private fun buildFitBoardPalette(
 ): FitBoardPalette {
     return when (themeMode) {
         AppThemeMode.SoftGreen -> FitBoardPalette(
-            bgGradientStart = Color(0xFFF7F4EA),
-            bgGradientEnd = Color(0xFFEEF5EE),
-            cardBg = Color(0xFFF9FBF6),
-            cardBorder = Color(0xFFDCE4D5),
-            textPrimary = Color(0xFF243127),
-            textSecondary = Color(0xFF7D897A),
-            textHint = Color(0xFF8C978A),
-            activeCardBg = Color(0xFFEDF7EF),
-            activeCardBorder = Color(0xFFCBE0CD),
-            activeText = Color(0xFF25472D),
+            bgGradientStart = Color(0xFFFCFCFD),
+            bgGradientEnd = Color(0xFFF7F7F8),
+            cardBg = Color(0xFFFFFFFF),
+            cardBorder = Color(0xFFE8E8EC),
+            textPrimary = Color(0xFF111214),
+            textSecondary = Color(0xFF666A73),
+            textHint = Color(0xFF8C9099),
+            activeCardBg = Color(0xFFF5F5F7),
+            activeCardBorder = Color(0xFFE4E4E8),
+            activeText = Color(0xFF17191D),
             inactiveCardBg = Color(0xFFFFFFFF),
-            inactiveCardBorder = Color(0xFFDDE4D9),
-            inactiveText = Color(0xFF5F6D5F),
-            badgeActiveBg = Color(0xFFDFF0E2),
-            badgeActiveText = Color(0xFF3E7248),
-            badgeInactiveBg = Color(0xFFF1F3EE),
-            badgeInactiveText = Color(0xFF879185),
-            innerPanelBg = Color(0xFFF6FAF3),
-            innerPanelBorder = Color(0xFFE3EADF),
-            buttonGreen = Color(0xFF4A7A56),
-            buttonSavedBg = Color(0xFFDFF0E2),
-            buttonSavedText = Color(0xFF3E7248),
-            circleActiveBg = Color(0xFFDFF0E2),
-            circleActiveBorder = Color(0xFFB9D7BC),
-            circleActiveCheck = Color(0xFF387147),
-            circleInactiveBg = Color(0xFFF7F8F3),
-            circleInactiveBorder = Color(0xFFD5DDD2),
-            countBadgeBg = Color(0xFFEEF6EC),
-            countBadgeBorder = Color(0xFFD8E5D8),
-            countBadgeText = Color(0xFF52725A),
-            weightSavedBadgeBg = Color(0xFFEEF6EC),
-            heatCellEmpty = Color(0xFFE8EEE4),
-            heatCellToday = Color(0xFFBED9C1),
-            heatCellTodayRecord = Color(0xFF6AAA7A),
-            heatCellRecord = Color(0xFF8EC99B),
-            heatTodayBorder = Color(0xFF8BC39A),
-            navBarBg = Color(0xFFF0F4EC),
-            dangerBg = Color(0xFFFFF1F0),
-            dangerBorder = Color(0xFFFFCDD0),
-            dangerText = Color(0xFFD9534F)
+            inactiveCardBorder = Color(0xFFE7E7EB),
+            inactiveText = Color(0xFF363A40),
+            badgeActiveBg = Color(0xFFF3F3F5),
+            badgeActiveText = Color(0xFF2A2D33),
+            badgeInactiveBg = Color(0xFFF8F8F9),
+            badgeInactiveText = Color(0xFF858994),
+            innerPanelBg = Color(0xFFF8F8FA),
+            innerPanelBorder = Color(0xFFEBEBEF),
+            buttonGreen = Color(0xFF17191D),
+            buttonSavedBg = Color(0xFFF1F1F3),
+            buttonSavedText = Color(0xFF2A2D33),
+            circleActiveBg = Color(0xFF17191D),
+            circleActiveBorder = Color(0xFF17191D),
+            circleActiveCheck = Color(0xFFFFFFFF),
+            circleInactiveBg = Color(0xFFFFFFFF),
+            circleInactiveBorder = Color(0xFFD6D8DE),
+            countBadgeBg = Color(0xFFF6F6F8),
+            countBadgeBorder = Color(0xFFE9E9ED),
+            countBadgeText = Color(0xFF5E636D),
+            weightSavedBadgeBg = Color(0xFFF4F4F6),
+            heatCellEmpty = Color(0xFFF0F0F3),
+            heatCellToday = Color(0xFFDDDEE4),
+            heatCellTodayRecord = Color(0xFF1C1F24),
+            heatCellRecord = Color(0xFFBFC2CB),
+            heatTodayBorder = Color(0xFF9B9FAA),
+            navBarBg = Color(0xFFF9F9FB),
+            dangerBg = Color(0xFFFFF4F4),
+            dangerBorder = Color(0xFFF0D7D6),
+            dangerText = Color(0xFFB5534D)
         )
 
         AppThemeMode.White -> FitBoardPalette(
@@ -312,10 +312,10 @@ internal fun FitCard(
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(20.dp))
-            .border(1.dp, FitBoardColors.cardBorder, RoundedCornerShape(20.dp))
+            .clip(RoundedCornerShape(18.dp))
+            .border(1.dp, FitBoardColors.cardBorder, RoundedCornerShape(18.dp))
             .background(FitBoardColors.cardBg)
-            .padding(16.dp),
+            .padding(horizontal = 16.dp, vertical = 15.dp),
         content = content
     )
 }
@@ -325,7 +325,7 @@ internal fun CardLabel(text: String) {
     Text(
         text = text,
         fontSize = 11.sp,
-        color = FitBoardColors.textSecondary
+        color = FitBoardColors.textHint
     )
 }
 
@@ -333,7 +333,7 @@ internal fun CardLabel(text: String) {
 internal fun CardTitle(text: String) {
     Text(
         text = text,
-        fontSize = 16.sp,
+        fontSize = 17.sp,
         fontWeight = FontWeight.SemiBold,
         color = FitBoardColors.textPrimary
     )

@@ -34,10 +34,22 @@ import androidx.compose.ui.unit.sp
 
 internal val DEFAULT_TRAINING_OPTIONS = listOf("胸", "背", "腿", "肩", "手臂", "有氧", "休息")
 internal val DEFAULT_SUPPLEMENT_OPTIONS = listOf("蛋白粉", "肌酸", "咖啡因", "鱼油", "维生素")
+internal val DEFAULT_HOME_VISIBLE_CARDS = HomeSummaryCard.entries.toSet()
 
 // ─── Shared App State ──────────────────────────────────────────────────────────
 // Owned by MainScaffold (shared Compose layer). All screens read from / write to
 // this single state. No duplication in the iOS host layer.
+
+enum class HomeSummaryCard(
+    val title: String,
+    val description: String
+) {
+    Steps("步数", "显示今日步数摘要"),
+    Sleep("睡眠", "显示昨晚睡眠摘要"),
+    Score("健康分", "显示今日健康分数"),
+    Supplements("补剂摄入情况", "显示今日补剂记录"),
+    Training("训练情况", "显示今日训练记录")
+}
 
 data class AppUiState(
     val weightInput: String = "",
@@ -51,11 +63,15 @@ data class AppUiState(
     val sleepGoalMinutes: Int = 0,
     val stepGoal: Int = 8000,
     val trainingOptions: List<String> = DEFAULT_TRAINING_OPTIONS,
-    val supplementOptions: List<String> = DEFAULT_SUPPLEMENT_OPTIONS
+    val supplementOptions: List<String> = DEFAULT_SUPPLEMENT_OPTIONS,
+    val homeVisibleCards: Set<HomeSummaryCard> = DEFAULT_HOME_VISIBLE_CARDS
 )
 
 internal fun AppUiState.hasAnyRecord(): Boolean =
     selectedTraining != null || checkedSupplements.isNotEmpty() || savedWeight != null || note.isNotBlank()
+
+internal fun AppUiState.homeCardsInDisplayOrder(): List<HomeSummaryCard> =
+    HomeSummaryCard.entries.filter { it in homeVisibleCards }
 
 // ─── Screen Enum ───────────────────────────────────────────────────────────────
 
@@ -92,7 +108,8 @@ fun MainScaffold() {
         appState.sleepGoalMinutes,
         appState.stepGoal,
         appState.trainingOptions,
-        appState.supplementOptions
+        appState.supplementOptions,
+        appState.homeVisibleCards
     ) {
         if (hasLoadedPersistence) {
             FitBoardFileStore.saveConfig(appState)
@@ -126,11 +143,7 @@ fun MainScaffold() {
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(
-                    Brush.verticalGradient(
-                        listOf(FitBoardColors.bgGradientStart, FitBoardColors.bgGradientEnd)
-                    )
-                )
+                .background(Brush.verticalGradient(listOf(FitBoardColors.bgGradientStart, FitBoardColors.bgGradientEnd)))
         ) {
             // Column layout: content takes all vertical space above the nav bar.
             // NavigationBar's windowInsets handles the iOS home indicator internally,
@@ -141,7 +154,8 @@ fun MainScaffold() {
                         AppScreen.Home -> HomeScreen(
                             state = appState,
                             dateInfo = dateInfo,
-                            today = today
+                            today = today,
+                            onStateChange = { appState = it }
                         )
                         AppScreen.Score -> HealthScoreScreen(
                             state = appState,
@@ -224,20 +238,17 @@ private fun FitBoardBottomNavItem(
     modifier: Modifier = Modifier
 ) {
     val containerColor = if (selected) FitBoardColors.activeCardBg else Color.Transparent
-    val borderColor = if (selected) {
-        FitBoardColors.activeCardBorder
-    } else {
-        Color.Transparent
-    }
-    val iconChipColor = if (selected) FitBoardColors.badgeActiveBg else FitBoardColors.badgeInactiveBg
-    val iconColor = if (selected) FitBoardColors.badgeActiveText else FitBoardColors.badgeInactiveText
+    val borderColor = if (selected) FitBoardColors.activeCardBorder else Color.Transparent
+    val iconChipColor = if (selected) FitBoardColors.innerPanelBg else Color.Transparent
+    val iconBorderColor = if (selected) FitBoardColors.innerPanelBorder else Color.Transparent
+    val iconColor = if (selected) FitBoardColors.textPrimary else FitBoardColors.textHint
     val labelColor = if (selected) FitBoardColors.textPrimary else FitBoardColors.textSecondary
 
     Box(
         modifier = modifier
-            .padding(horizontal = 4.dp)
-            .clip(RoundedCornerShape(22.dp))
-            .border(1.dp, borderColor, RoundedCornerShape(22.dp))
+            .padding(horizontal = 4.dp, vertical = 2.dp)
+            .clip(RoundedCornerShape(18.dp))
+            .border(1.dp, borderColor, RoundedCornerShape(18.dp))
             .background(containerColor)
             .clickable { onClick() }
             .padding(horizontal = 6.dp, vertical = 8.dp),
@@ -248,14 +259,15 @@ private fun FitBoardBottomNavItem(
         ) {
             Box(
                 modifier = Modifier
-                    .size(28.dp)
-                    .clip(RoundedCornerShape(10.dp))
+                    .size(26.dp)
+                    .clip(RoundedCornerShape(9.dp))
+                    .border(1.dp, iconBorderColor, RoundedCornerShape(9.dp))
                     .background(iconChipColor),
                 contentAlignment = Alignment.Center
             ) {
                 Text(
                     text = screen.icon,
-                    fontSize = 15.sp,
+                    fontSize = 14.sp,
                     fontWeight = FontWeight.SemiBold,
                     color = iconColor
                 )
@@ -263,7 +275,7 @@ private fun FitBoardBottomNavItem(
             Text(
                 text = screen.label,
                 fontSize = 11.sp,
-                fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
+                fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
                 color = labelColor
             )
         }

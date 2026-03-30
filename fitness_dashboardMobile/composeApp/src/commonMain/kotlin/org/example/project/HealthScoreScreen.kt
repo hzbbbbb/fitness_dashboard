@@ -264,7 +264,7 @@ private fun ScoreCompositionRow(
 }
 
 @Composable
-private fun ScoreTag(text: String) {
+internal fun ScoreTag(text: String) {
     Box(
         modifier = Modifier
             .clip(RoundedCornerShape(20.dp))
@@ -280,13 +280,13 @@ private fun ScoreTag(text: String) {
     }
 }
 
-private data class HealthScorePageState(
+internal data class HealthScorePageState(
     val totalScore: Double,
     val levelLabel: String,
     val items: List<HealthScoreItemState>
 )
 
-private data class HealthScoreItemState(
+internal data class HealthScoreItemState(
     val label: String,
     val score: Double,
     val maxScore: Int,
@@ -294,7 +294,7 @@ private data class HealthScoreItemState(
     val weightText: String
 )
 
-private fun buildHealthScoreState(
+internal fun buildHealthScoreState(
     state: AppUiState,
     healthState: HealthSummaryUiState
 ): HealthScorePageState {
@@ -432,7 +432,7 @@ private fun levelForScore(score: Int): String =
         else -> "较差"
     }
 
-private fun formatScore(score: Double): String {
+internal fun formatScore(score: Double): String {
     val rounded = (score * 10).roundToInt() / 10.0
     return if (rounded % 1.0 == 0.0) {
         rounded.roundToInt().toString()
