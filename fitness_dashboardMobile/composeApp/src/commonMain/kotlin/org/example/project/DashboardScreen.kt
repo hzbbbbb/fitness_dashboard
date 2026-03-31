@@ -37,7 +37,17 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlin.math.roundToInt
 
-private const val HEATMAP_WEEKS = 11
+private const val HEATMAP_WEEKS = 13
+
+private val HeatmapCardBorderColor = Color(0xFFE1E6EE)
+private val HeatmapPanelColor = Color(0xFFF4F7FB)
+private val HeatmapPanelBorderColor = Color(0xFFE4EAF2)
+private val HeatmapEmptyCellColor = Color(0xFFE3E9F2)
+private val HeatmapLevel1Color = Color(0xFFD5E2F8)
+private val HeatmapLevel2Color = Color(0xFFB7D0F6)
+private val HeatmapLevel3Color = Color(0xFF8EB4F0)
+private val HeatmapLevel4Color = Color(0xFF5F8FE0)
+private val HeatmapLevel5Color = Color(0xFF275FCA)
 
 private data class HeatmapModel(
     val weeks: List<HeatmapWeekColumn>
@@ -57,7 +67,8 @@ private data class HeatmapDayCell(
 
 private data class HeatmapLayoutMetrics(
     val cellSize: Dp,
-    val cellGap: Dp
+    val cellGap: Dp,
+    val weekGap: Dp
 )
 
 private enum class HeatmapScoreLevel {
@@ -242,7 +253,7 @@ private fun HeatmapCard(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(24.dp))
-            .border(1.dp, FitBoardColors.cardBorder, RoundedCornerShape(24.dp))
+            .border(1.dp, HeatmapCardBorderColor, RoundedCornerShape(24.dp))
             .background(FitBoardColors.cardBg)
     ) {
         val metrics = rememberHeatmapLayoutMetrics(maxWidth = maxWidth)
@@ -265,8 +276,9 @@ private fun HeatmapCard(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(20.dp))
-                    .background(FitBoardColors.bgGradientEnd)
-                    .padding(horizontal = 4.dp, vertical = 8.dp)
+                    .border(1.dp, HeatmapPanelBorderColor, RoundedCornerShape(20.dp))
+                    .background(HeatmapPanelColor)
+                    .padding(horizontal = 8.dp, vertical = 10.dp)
             ) {
                 Box(
                     modifier = Modifier.fillMaxWidth(),
@@ -274,7 +286,10 @@ private fun HeatmapCard(
                 ) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
+                        horizontalArrangement = Arrangement.spacedBy(
+                            space = metrics.weekGap,
+                            alignment = Alignment.CenterHorizontally
+                        ),
                         verticalAlignment = Alignment.Top
                     ) {
                         heatmapModel.weeks.forEach { week ->
@@ -345,14 +360,21 @@ private fun HeatmapCell(
 
 @Composable
 private fun rememberHeatmapLayoutMetrics(maxWidth: Dp): HeatmapLayoutMetrics {
-    val gridWidth = maxWidth - 36.dp
-    val rawCellSize = gridWidth / HEATMAP_WEEKS
-    val cellSize = rawCellSize.coerceIn(18.dp, 20.dp)
-    val cellGap = 3.dp
+    val availableWidth = (maxWidth - 44.dp).coerceAtLeast(248.dp)
+    val cellGap = 2.5.dp
+    val baseWeekGap = 3.5.dp
+    val rawCellSize = (availableWidth - (baseWeekGap * (HEATMAP_WEEKS - 1))) / HEATMAP_WEEKS
+    val cellSize = rawCellSize.coerceIn(16.dp, 20.dp)
+    val weekGap = if (HEATMAP_WEEKS > 1) {
+        ((availableWidth - (cellSize * HEATMAP_WEEKS)) / (HEATMAP_WEEKS - 1)).coerceIn(3.dp, 5.dp)
+    } else {
+        0.dp
+    }
 
     return HeatmapLayoutMetrics(
         cellSize = cellSize,
-        cellGap = cellGap
+        cellGap = cellGap,
+        weekGap = weekGap
     )
 }
 
@@ -460,12 +482,12 @@ private fun heatmapLevelForScore(score: Int?): HeatmapScoreLevel {
 @Composable
 private fun heatmapColorForLevel(level: HeatmapScoreLevel): Color {
     return when (level) {
-        HeatmapScoreLevel.Empty -> FitBoardColors.heatCellEmpty
-        HeatmapScoreLevel.Level1 -> FitBoardColors.heatCellLevel1
-        HeatmapScoreLevel.Level2 -> FitBoardColors.heatCellLevel2
-        HeatmapScoreLevel.Level3 -> FitBoardColors.heatCellLevel3
-        HeatmapScoreLevel.Level4 -> FitBoardColors.heatCellLevel4
-        HeatmapScoreLevel.Level5 -> FitBoardColors.heatCellLevel5
+        HeatmapScoreLevel.Empty -> HeatmapEmptyCellColor
+        HeatmapScoreLevel.Level1 -> HeatmapLevel1Color
+        HeatmapScoreLevel.Level2 -> HeatmapLevel2Color
+        HeatmapScoreLevel.Level3 -> HeatmapLevel3Color
+        HeatmapScoreLevel.Level4 -> HeatmapLevel4Color
+        HeatmapScoreLevel.Level5 -> HeatmapLevel5Color
     }
 }
 
