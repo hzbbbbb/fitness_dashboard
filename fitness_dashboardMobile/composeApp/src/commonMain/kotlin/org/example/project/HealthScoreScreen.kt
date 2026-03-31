@@ -5,14 +5,15 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -21,8 +22,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlin.math.roundToInt
@@ -31,6 +32,8 @@ private const val SLEEP_MAX_SCORE = 40
 private const val STEP_MAX_SCORE = 25
 private const val TRAINING_MAX_SCORE = 20
 private const val SUPPLEMENT_MAX_SCORE = 15
+private val ScoreCardBaseColor = Color(0xFFF3F5F8)
+private val ScoreProgressFillColor = Color(0xFFD9E8FF)
 
 @Composable
 fun HealthScoreScreen(
@@ -72,9 +75,6 @@ fun HealthScoreScreen(
         Spacer(Modifier.height(12.dp))
 
         DimensionScoresCard(scoreState = scoreState)
-        Spacer(Modifier.height(12.dp))
-
-        ScoreCompositionCard(scoreState = scoreState)
 
         Spacer(Modifier.height(28.dp))
     }
@@ -145,15 +145,52 @@ private fun DimensionScoresCard(scoreState: HealthScorePageState) {
 
 @Composable
 private fun ScoreDimensionRow(item: HealthScoreItemState) {
+    val progress = (item.score / item.maxScore.toDouble())
+        .coerceIn(0.0, 1.0)
+        .toFloat()
+    val outerShape = RoundedCornerShape(18.dp)
+    val innerShape = RoundedCornerShape(17.dp)
+    val progressShape = if (progress >= 0.999f) {
+        innerShape
+    } else {
+        RoundedCornerShape(
+            topStart = 17.dp,
+            bottomStart = 17.dp,
+            topEnd = 10.dp,
+            bottomEnd = 10.dp
+        )
+    }
+
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(18.dp))
-            .border(1.dp, FitBoardColors.innerPanelBorder, RoundedCornerShape(18.dp))
-            .background(FitBoardColors.innerPanelBg)
-            .padding(horizontal = 14.dp, vertical = 14.dp)
+            .height(IntrinsicSize.Min)
+            .clip(outerShape)
+            .border(1.dp, FitBoardColors.innerPanelBorder, outerShape)
+            .background(ScoreCardBaseColor)
     ) {
-        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(1.dp)
+                .clip(innerShape)
+                .background(ScoreCardBaseColor)
+        ) {
+            if (progress > 0f) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth(progress)
+                        .fillMaxHeight()
+                        .clip(progressShape)
+                        .background(ScoreProgressFillColor)
+                )
+            }
+        }
+
+        Column(
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 14.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -174,72 +211,12 @@ private fun ScoreDimensionRow(item: HealthScoreItemState) {
             }
 
             Text(
-                    text = item.summary,
-                    fontSize = 13.sp,
-                    lineHeight = 20.sp,
-                    color = FitBoardColors.textSecondary
-                )
-            }
-        }
-}
-
-@Composable
-private fun ScoreCompositionCard(scoreState: HealthScorePageState) {
-    FitCard {
-        CardLabel("构成")
-        Spacer(Modifier.height(4.dp))
-        CardTitle("评分构成")
-        Spacer(Modifier.height(14.dp))
-
-        scoreState.items.forEachIndexed { index, item ->
-            ScoreCompositionRow(
-                label = item.label,
-                weightText = item.weightText,
-                value = "${formatScore(item.score)} / ${item.maxScore}"
+                text = item.summary,
+                fontSize = 13.sp,
+                lineHeight = 20.sp,
+                color = FitBoardColors.textSecondary
             )
-            if (index != scoreState.items.lastIndex) {
-                Spacer(Modifier.height(8.dp))
-            }
         }
-    }
-}
-
-@Composable
-private fun ScoreCompositionRow(
-    label: String,
-    weightText: String,
-    value: String
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(16.dp))
-            .border(1.dp, FitBoardColors.innerPanelBorder, RoundedCornerShape(16.dp))
-            .background(FitBoardColors.innerPanelBg)
-            .padding(horizontal = 14.dp, vertical = 12.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Text(
-            text = label,
-            fontSize = 13.sp,
-            color = FitBoardColors.textPrimary,
-            modifier = Modifier.width(48.dp),
-            fontWeight = FontWeight.Medium
-        )
-        Text(
-            text = weightText,
-            fontSize = 12.sp,
-            color = FitBoardColors.textHint,
-            modifier = Modifier.width(52.dp)
-        )
-        Spacer(Modifier.width(8.dp))
-        Text(
-            text = value,
-            fontSize = 13.sp,
-            color = FitBoardColors.textSecondary,
-            modifier = Modifier.weight(1f),
-            textAlign = TextAlign.End
-        )
     }
 }
 
