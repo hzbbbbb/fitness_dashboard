@@ -40,10 +40,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlin.math.roundToInt
 
 @Composable
 fun RecordsScreen(
     state: AppUiState,
+    healthState: HealthSummaryUiState,
     today: String,
     onWeightChange: (String) -> Unit,
     onTrainingChange: (String?) -> Unit,
@@ -100,7 +102,10 @@ fun RecordsScreen(
 
             Spacer(Modifier.height(18.dp))
 
-            RecordCompletenessBanner(state = state)
+            RecordCompletenessBanner(
+                state = state,
+                healthState = healthState
+            )
             Spacer(Modifier.height(12.dp))
 
             WeightRecordCard(
@@ -112,7 +117,8 @@ fun RecordsScreen(
 
             TrainingRecordCard(
                 selected = state.selectedTraining,
-                options = state.trainingOptions,
+                items = state.trainingItems,
+                healthState = healthState,
                 onSelect = { option ->
                     val updated = if (state.selectedTraining == option) null else option
                     onTrainingChange(updated)
@@ -144,9 +150,14 @@ fun RecordsScreen(
 }
 
 @Composable
-private fun RecordCompletenessBanner(state: AppUiState) {
+private fun RecordCompletenessBanner(
+    state: AppUiState,
+    healthState: HealthSummaryUiState
+) {
+    val hasReadOnlyWorkout = healthState.hasNonStrengthWorkout()
+    val trainingRecorded = hasReadOnlyWorkout || state.selectedTraining != null
     val filledCount = listOfNotNull(
-        state.selectedTraining,
+        if (trainingRecorded) "training" else null,
         state.savedWeight,
         if (state.checkedSupplements.isNotEmpty()) "sup" else null,
         if (state.note.isNotEmpty()) "note" else null
@@ -263,31 +274,145 @@ internal fun WeightRecordCard(
 @Composable
 internal fun TrainingRecordCard(
     selected: String?,
-    options: List<String>,
+    items: List<TrainingItemConfig>,
+    healthState: HealthSummaryUiState,
     onSelect: (String) -> Unit
 ) {
+    val hasDisplayWorkout = healthState.hasWorkout && healthState.primaryWorkoutDisplayType().isNotBlank()
+    val hasTraditionalStrengthWorkout = healthState.hasTraditionalStrengthWorkout()
+    val hasReadOnlyWorkout = healthState.hasNonStrengthWorkout()
+    val primaryWorkoutType = healthState.primaryWorkoutDisplayType()
+    val primaryWorkoutDurationMinutes = healthState.primaryWorkoutDisplayDurationMinutes()
+    val additionalWorkouts = healthState.additionalWorkoutEntries()
+    val strengthItems = remember(items) {
+        items.strengthTrainingItems()
+    }
+    val otherWorkoutItem = remember(items) {
+        items.otherWorkoutItem()
+    }
+    val visibleItems = if (hasTraditionalStrengthWorkout) strengthItems else items
+    val workoutDisplayName = when {
+        hasTraditionalStrengthWorkout -> "传统力量训练"
+        hasReadOnlyWorkout -> primaryWorkoutType.ifEmpty { otherWorkoutItem.name }
+        else -> primaryWorkoutType
+    }
+
     FitCard {
         CardLabel("训练")
         Spacer(Modifier.height(4.dp))
         CardTitle("今日训练")
         Spacer(Modifier.height(14.dp))
 
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(18.dp))
-                .border(1.dp, FitBoardColors.innerPanelBorder, RoundedCornerShape(18.dp))
-                .background(FitBoardColors.innerPanelBg)
-                .padding(8.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp)
-        ) {
-            options.forEach { option ->
-                SelectableRecordItem(
-                    label = option,
-                    isActive = option == selected,
-                    activeLabel = "已选",
-                    inactiveLabel = "未选",
-                    onClick = { onSelect(option) }
+        if (hasDisplayWorkout) {
+            WorkoutSummaryPanel(
+                workoutType = workoutDisplayName,
+                durationMinutes = primaryWorkoutDurationMinutes
+            )
+
+            if (additionalWorkouts.isNotEmpty() || !hasReadOnlyWorkout) {
+                Spacer(Modifier.height(12.dp))
+            }
+        }
+
+        if (additionalWorkouts.isNotEmpty()) {
+            AdditionalWorkoutListPanel(items = additionalWorkouts)
+
+            if (!hasReadOnlyWorkout) {
+                Spacer(Modifier.height(12.dp))
+            }
+        }
+
+        if (!hasReadOnlyWorkout) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(18.dp))
+                    .border(1.dp, FitBoardColors.innerPanelBorder, RoundedCornerShape(18.dp))
+                    .background(FitBoardColors.innerPanelBg)
+                    .padding(8.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                visibleItems.forEach { item ->
+                    SelectableRecordItem(
+                        label = item.name,
+                        isActive = item.name == selected,
+                        activeLabel = "已选",
+                        inactiveLabel = "未选",
+                        onClick = { onSelect(item.name) }
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun AdditionalWorkoutListPanel(items: List<WorkoutDisplayEntry>) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(18.dp))
+            .border(1.dp, FitBoardColors.innerPanelBorder, RoundedCornerShape(18.dp))
+            .background(FitBoardColors.innerPanelBg)
+            .padding(horizontal = 14.dp, vertical = 14.dp)
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Text(
+                text = "其他训练",
+                fontSize = 13.sp,
+                color = FitBoardColors.textSecondary
+            )
+
+            items.forEach { item ->
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = item.type,
+                        fontSize = 15.sp,
+                        color = FitBoardColors.textPrimary
+                    )
+                    Text(
+                        text = item.durationMinutes.formatWorkoutDurationText() ?: "0分钟",
+                        fontSize = 13.sp,
+                        color = FitBoardColors.textSecondary
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun WorkoutSummaryPanel(
+    workoutType: String,
+    durationMinutes: Double
+) {
+    val durationText = durationMinutes.formatWorkoutDurationText()
+
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(18.dp))
+            .border(1.dp, FitBoardColors.innerPanelBorder, RoundedCornerShape(18.dp))
+            .background(FitBoardColors.innerPanelBg)
+            .padding(horizontal = 14.dp, vertical = 14.dp)
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text(
+                text = workoutType,
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Medium,
+                color = FitBoardColors.textPrimary
+            )
+
+            if (durationText != null) {
+                Text(
+                    text = durationText,
+                    fontSize = 13.sp,
+                    color = FitBoardColors.textSecondary
                 )
             }
         }
@@ -462,4 +587,34 @@ internal fun NotesRecordCard(note: String, onNoteChange: (String) -> Unit) {
             maxLines = 5,
         )
     }
+}
+
+private fun HealthSummaryUiState.hasTraditionalStrengthWorkout(): Boolean {
+    return hasWorkout && primaryWorkoutDisplayType() == "传统力量训练"
+}
+
+private fun HealthSummaryUiState.hasNonStrengthWorkout(): Boolean {
+    return hasWorkout && primaryWorkoutDisplayType().isNotBlank() && !hasTraditionalStrengthWorkout()
+}
+
+private fun List<TrainingItemConfig>.strengthTrainingItems(): List<TrainingItemConfig> {
+    val filtered = filter { it.category == TrainingCategory.TraditionalStrengthTraining }
+    return if (filtered.isEmpty()) {
+        DEFAULT_TRAINING_ITEMS.filter { it.category == TrainingCategory.TraditionalStrengthTraining }
+    } else {
+        filtered
+    }
+}
+
+private fun List<TrainingItemConfig>.otherWorkoutItem(): TrainingItemConfig {
+    return firstOrNull { it.category == TrainingCategory.OtherWorkout }
+        ?: DEFAULT_TRAINING_ITEMS.first { it.category == TrainingCategory.OtherWorkout }
+}
+
+private fun Double.formatWorkoutDurationText(): String? {
+    if (this <= 0.0) {
+        return null
+    }
+
+    return "${roundToInt()}分钟"
 }

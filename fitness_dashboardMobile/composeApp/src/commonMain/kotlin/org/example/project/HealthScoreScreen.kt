@@ -251,13 +251,18 @@ internal data class HealthScoreItemState(
     val weightText: String
 )
 
+private data class TrainingScoreState(
+    val score: Double,
+    val summary: String
+)
+
 internal fun buildHealthScoreState(
     state: AppUiState,
     healthState: HealthSummaryUiState
 ): HealthScorePageState {
     val sleepScore = calculateSleepScore(healthState, state)
     val stepScore = calculateStepScore(healthState, state)
-    val trainingScore = calculateTrainingScore(state.selectedTraining).toDouble()
+    val trainingScoreState = calculateTrainingScoreState(state, healthState)
     val supplementScore = calculateSupplementScore(
         checkedCount = state.checkedSupplements.size,
         totalCount = state.supplementOptions.size
@@ -288,9 +293,9 @@ internal fun buildHealthScoreState(
         ),
         HealthScoreItemState(
             label = "训练",
-            score = trainingScore,
+            score = trainingScoreState.score,
             maxScore = TRAINING_MAX_SCORE,
-            summary = state.selectedTraining?.let { "已记录 · $it" } ?: "未训练",
+            summary = trainingScoreState.summary,
             weightText = "20%"
         ),
         HealthScoreItemState(
@@ -341,17 +346,159 @@ private fun calculateStepScore(
         ).coerceAtMost(1.0)
 }
 
-private fun calculateTrainingScore(training: String?): Int {
-    val value = training?.trim().orEmpty()
-    if (value.isEmpty()) return 8
+private fun calculateTrainingScoreState(
+    state: AppUiState,
+    healthState: HealthSummaryUiState
+): TrainingScoreState {
+    if (!healthState.hasWorkout) {
+        return TrainingScoreState(
+            score = 0.0,
+            summary = "暂无训练数据"
+        )
+    }
 
+    val primaryWorkoutType = healthState.primaryWorkoutTypeForScoring()
+    val primaryWorkoutMinutes = healthState.primaryWorkoutDurationMinutesForScoring()
+    val additionalWorkoutMinutes = healthState.scoreAdditionalWorkoutDurationMinutes.coerceAtLeast(0.0)
+    val primaryTargetMinutes = resolvePrimaryTrainingTargetMinutes(
+        state = state,
+        primaryWorkoutType = primaryWorkoutType
+    )
+    val additionalTargetMinutes = resolveAdditionalTrainingTargetMinutes(state)
+    val displayLabel = resolveTrainingDisplayLabel(
+        state = state,
+        primaryWorkoutType = primaryWorkoutType
+    )
+
+    val primaryScore = calculateTrainingScoreComponent(
+        actualMinutes = primaryWorkoutMinutes,
+        targetMinutes = primaryTargetMinutes,
+        multiplier = 1.0
+    )
+    val additionalScore = calculateTrainingScoreComponent(
+        actualMinutes = additionalWorkoutMinutes,
+        targetMinutes = additionalTargetMinutes,
+        multiplier = 0.3
+    )
+    val totalScore = (primaryScore + additionalScore).coerceAtMost(TRAINING_MAX_SCORE.toDouble())
+
+    if (primaryTargetMinutes == null || primaryTargetMinutes <= 0) {
+        return TrainingScoreState(
+            score = totalScore,
+            summary = if (primaryWorkoutMinutes > 0.0) {
+                buildTrainingScoreSummary(
+                    displayLabel = displayLabel,
+                    primaryWorkoutMinutes = primaryWorkoutMinutes,
+                    primaryTargetMinutes = null,
+                    additionalWorkoutMinutes = additionalWorkoutMinutes
+                )
+            } else {
+                displayLabel
+            }
+        )
+    }
+
+    return TrainingScoreState(
+        score = totalScore,
+        summary = buildTrainingScoreSummary(
+            displayLabel = displayLabel,
+            primaryWorkoutMinutes = primaryWorkoutMinutes,
+            primaryTargetMinutes = primaryTargetMinutes,
+            additionalWorkoutMinutes = additionalWorkoutMinutes
+        )
+    )
+}
+
+private fun resolvePrimaryTrainingTargetMinutes(
+    state: AppUiState,
+    primaryWorkoutType: String
+): Int? {
+    if (primaryWorkoutType == TrainingCategory.TraditionalStrengthTraining.title) {
+        val selectedStrength = state.selectedTraining
+            ?.takeIf { selected ->
+                state.trainingItemsIn(TrainingCategory.TraditionalStrengthTraining)
+                    .any { it.name == selected }
+            }
+
+        return when {
+            selectedStrength != null -> state.defaultTrainingDurationFor(selectedStrength)
+            else -> state.trainingItemsIn(TrainingCategory.TraditionalStrengthTraining)
+                .firstOrNull()
+                ?.defaultDurationMinutes
+                ?: TrainingCategory.TraditionalStrengthTraining.defaultDurationMinutes
+        }
+    }
+
+    return resolveAdditionalTrainingTargetMinutes(state)
+}
+
+private fun resolveAdditionalTrainingTargetMinutes(
+    state: AppUiState
+): Int? {
+    return state.trainingItemsIn(TrainingCategory.OtherWorkout)
+        .firstOrNull()
+        ?.defaultDurationMinutes
+        ?: TrainingCategory.OtherWorkout.defaultDurationMinutes
+}
+
+private fun resolveTrainingDisplayLabel(
+    state: AppUiState,
+    primaryWorkoutType: String
+): String {
+    if (primaryWorkoutType == TrainingCategory.TraditionalStrengthTraining.title) {
+        val selectedStrength = state.selectedTraining
+            ?.takeIf { selected ->
+                state.trainingItemsIn(TrainingCategory.TraditionalStrengthTraining)
+                    .any { it.name == selected }
+            }
+
+        return selectedStrength?.let { detail ->
+            "传统力量训练：$detail"
+        } ?: "传统力量训练"
+    }
+
+    return primaryWorkoutType.ifEmpty { TrainingCategory.OtherWorkout.title }
+}
+
+private fun calculateTrainingScoreComponent(
+    actualMinutes: Double,
+    targetMinutes: Int?,
+    multiplier: Double
+): Double {
+    if (actualMinutes <= 0.0) return 0.0
+
+    val safeTargetMinutes = targetMinutes?.takeIf { it > 0 } ?: return 0.0
+    return TRAINING_MAX_SCORE * (actualMinutes / safeTargetMinutes.toDouble())
+        .coerceAtMost(1.0) * multiplier
+}
+
+private fun buildTrainingScoreSummary(
+    displayLabel: String,
+    primaryWorkoutMinutes: Double,
+    primaryTargetMinutes: Int?,
+    additionalWorkoutMinutes: Double
+): String {
+    val primaryPart = if (primaryTargetMinutes != null && primaryTargetMinutes > 0) {
+        "$displayLabel · ${formatMinutes(primaryWorkoutMinutes)}/${primaryTargetMinutes}分钟"
+    } else {
+        "$displayLabel · ${formatMinutes(primaryWorkoutMinutes)}分钟"
+    }
+
+    if (additionalWorkoutMinutes <= 0.0) {
+        return primaryPart
+    }
+
+    return "$primaryPart + ${formatMinutes(additionalWorkoutMinutes)}分钟"
+}
+
+private fun HealthSummaryUiState.primaryWorkoutTypeForScoring(): String {
+    return scorePrimaryWorkoutType.trim().ifEmpty { workoutType.trim() }
+}
+
+private fun HealthSummaryUiState.primaryWorkoutDurationMinutesForScoring(): Double {
     return when {
-        value == "休息" || value.contains("休息") -> 12
-        value == "有氧" || value.contains("有氧") -> 14
-        value in setOf("胸", "背", "腿", "肩", "手臂") -> 18
-        value.contains("力量") || value.contains("胸") || value.contains("背") ||
-            value.contains("腿") || value.contains("肩") || value.contains("手臂") -> 18
-        else -> 14
+        scorePrimaryWorkoutDurationMinutes > 0.0 -> scorePrimaryWorkoutDurationMinutes
+        else -> workoutDurationMinutes.coerceAtLeast(0.0)
     }
 }
 
@@ -396,4 +543,8 @@ internal fun formatScore(score: Double): String {
     } else {
         rounded.toString()
     }
+}
+
+private fun formatMinutes(minutes: Double): String {
+    return formatScore(minutes)
 }

@@ -58,21 +58,46 @@ fun SettingsScreen(
             onBack = { currentPage = SettingsPage.Home }
         ) {
             TrainingSettingsSection(
-                options = state.trainingOptions,
-                onAdd = { name ->
+                items = state.trainingItems,
+                onAdd = { category, name ->
                     if (name.isNotBlank() && name !in state.trainingOptions) {
-                        onStateChange(state.copy(trainingOptions = state.trainingOptions + name))
-                    }
-                },
-                onDelete = { name ->
-                    if (state.trainingOptions.size > 1) {
                         onStateChange(
                             state.copy(
-                                trainingOptions = state.trainingOptions - name,
-                                selectedTraining = if (state.selectedTraining == name) null else state.selectedTraining
+                                trainingItems = state.trainingItems.insertTrainingItem(
+                                    TrainingItemConfig(
+                                        name = name,
+                                        category = category,
+                                        defaultDurationMinutes = defaultTrainingDurationFor(name, category)
+                                    )
+                                )
                             )
                         )
                     }
+                },
+                onDelete = { item ->
+                    if (state.trainingItems.count { it.category == item.category } > 1) {
+                        onStateChange(
+                            state.copy(
+                                trainingItems = state.trainingItems.filterNot { it.name == item.name },
+                                selectedTraining = if (state.selectedTraining == item.name) null else state.selectedTraining
+                            )
+                        )
+                    }
+                },
+                onDurationChange = { item, duration ->
+                    onStateChange(
+                        state.copy(
+                            trainingItems = state.trainingItems.map { current ->
+                                if (current.name == item.name) {
+                                    current.copy(
+                                        defaultDurationMinutes = normalizeTrainingDurationMinutes(duration)
+                                    )
+                                } else {
+                                    current
+                                }
+                            }
+                        )
+                    )
                 }
             )
         }
@@ -304,35 +329,99 @@ private fun SettingsSubpageBackButton(onBack: () -> Unit) {
 
 @Composable
 internal fun TrainingSettingsSection(
-    options: List<String>,
-    onAdd: (String) -> Unit,
-    onDelete: (String) -> Unit
+    items: List<TrainingItemConfig>,
+    onAdd: (TrainingCategory, String) -> Unit,
+    onDelete: (TrainingItemConfig) -> Unit,
+    onDurationChange: (TrainingItemConfig, Int) -> Unit
 ) {
-    var draft by remember { mutableStateOf("") }
+    var strengthDraft by remember { mutableStateOf("") }
 
-    SettingsCard(label = "训练", title = "训练类型") {
-        AddInputRow(
-            value = draft,
-            placeholder = "新增训练类型",
-            addLabel = "新增",
-            onValueChange = { draft = it },
-            onAdd = {
-                onAdd(draft.trim())
-                draft = ""
-            }
-        )
+    val strengthItems = remember(items) {
+        items.filter { it.category == TrainingCategory.TraditionalStrengthTraining }
+    }
+    val otherItems = remember(items) {
+        items.filter { it.category == TrainingCategory.OtherWorkout }
+    }
 
-        Spacer(Modifier.height(10.dp))
+    TrainingGroupSettingsCard(
+        category = TrainingCategory.TraditionalStrengthTraining,
+        items = strengthItems,
+        draft = strengthDraft,
+        placeholder = "新增力量训练项",
+        showAddInput = true,
+        allowDelete = true,
+        onDraftChange = { strengthDraft = it },
+        onAdd = {
+            onAdd(TrainingCategory.TraditionalStrengthTraining, strengthDraft.trim())
+            strengthDraft = ""
+        },
+        onDelete = onDelete,
+        onDurationChange = onDurationChange
+    )
 
-        if (options.isEmpty()) {
+    Spacer(Modifier.height(12.dp))
+
+    TrainingGroupSettingsCard(
+        category = TrainingCategory.OtherWorkout,
+        items = otherItems,
+        draft = "",
+        placeholder = "",
+        showAddInput = false,
+        allowDelete = false,
+        onDraftChange = {},
+        onAdd = {},
+        onDelete = onDelete,
+        onDurationChange = onDurationChange
+    )
+}
+
+@Composable
+private fun TrainingGroupSettingsCard(
+    category: TrainingCategory,
+    items: List<TrainingItemConfig>,
+    draft: String,
+    placeholder: String,
+    showAddInput: Boolean,
+    allowDelete: Boolean,
+    onDraftChange: (String) -> Unit,
+    onAdd: () -> Unit,
+    onDelete: (TrainingItemConfig) -> Unit,
+    onDurationChange: (TrainingItemConfig, Int) -> Unit
+) {
+    SettingsCard(label = "训练", title = category.title) {
+        if (showAddInput) {
+            AddInputRow(
+                value = draft,
+                placeholder = placeholder,
+                addLabel = "新增",
+                onValueChange = onDraftChange,
+                onAdd = onAdd
+            )
+
+            Spacer(Modifier.height(10.dp))
+        }
+
+        if (items.isEmpty()) {
             EmptyHint("暂无训练项")
         } else {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                options.forEach { name ->
-                    SettingsItemRow(
-                        name = name,
-                        canDelete = options.size > 1,
-                        onDelete = { onDelete(name) }
+                items.forEach { item ->
+                    TrainingSettingsItemRow(
+                        item = item,
+                        canDelete = allowDelete && items.size > 1,
+                        onDelete = { onDelete(item) },
+                        onDurationDecrease = {
+                            onDurationChange(
+                                item,
+                                item.defaultDurationMinutes - TRAINING_DURATION_STEP_MINUTES
+                            )
+                        },
+                        onDurationIncrease = {
+                            onDurationChange(
+                                item,
+                                item.defaultDurationMinutes + TRAINING_DURATION_STEP_MINUTES
+                            )
+                        }
                     )
                 }
             }
@@ -756,19 +845,136 @@ private fun SettingsItemRow(
         }
         Spacer(Modifier.width(8.dp))
         if (canDelete) {
-            Button(
-                onClick = onDelete,
-                shape = RoundedCornerShape(10.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = FitBoardColors.dangerBg,
-                    contentColor = FitBoardColors.dangerText,
-                ),
-                elevation = ButtonDefaults.buttonElevation(0.dp)
-            ) {
-                Text("删除", fontSize = 12.sp)
-            }
+            DeleteButton(onDelete = onDelete)
         }
     }
+}
+
+@Composable
+private fun TrainingSettingsItemRow(
+    item: TrainingItemConfig,
+    canDelete: Boolean,
+    onDelete: () -> Unit,
+    onDurationDecrease: () -> Unit,
+    onDurationIncrease: () -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(18.dp))
+            .border(1.dp, FitBoardColors.inactiveCardBorder, RoundedCornerShape(18.dp))
+            .background(FitBoardColors.inactiveCardBg)
+            .padding(horizontal = 14.dp, vertical = 13.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = item.name,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Medium,
+                color = FitBoardColors.textPrimary
+            )
+
+            if (canDelete) {
+                DeleteButton(onDelete = onDelete)
+            }
+        }
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            DurationStepperActionButton(
+                label = "−",
+                enabled = item.defaultDurationMinutes > TRAINING_DURATION_MIN_MINUTES,
+                onClick = onDurationDecrease
+            )
+
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(16.dp))
+                    .border(1.dp, FitBoardColors.countBadgeBorder, RoundedCornerShape(16.dp))
+                    .background(FitBoardColors.innerPanelBg)
+                    .padding(horizontal = 14.dp, vertical = 8.dp)
+            ) {
+                Text(
+                    text = item.defaultDurationMinutes.formatTrainingDuration(),
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = FitBoardColors.textPrimary
+                )
+            }
+
+            DurationStepperActionButton(
+                label = "+",
+                enabled = item.defaultDurationMinutes < TRAINING_DURATION_MAX_MINUTES,
+                onClick = onDurationIncrease
+            )
+        }
+    }
+}
+
+@Composable
+private fun DurationStepperActionButton(
+    label: String,
+    enabled: Boolean,
+    onClick: () -> Unit
+) {
+    Box(
+        modifier = Modifier
+            .clip(RoundedCornerShape(14.dp))
+            .border(
+                1.dp,
+                if (enabled) FitBoardColors.activeCardBorder else FitBoardColors.inactiveCardBorder,
+                RoundedCornerShape(14.dp)
+            )
+            .background(if (enabled) FitBoardColors.activeCardBg else FitBoardColors.inactiveCardBg)
+            .clickable(enabled = enabled) { onClick() }
+            .padding(horizontal = 14.dp, vertical = 8.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = label,
+            fontSize = 14.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = if (enabled) FitBoardColors.activeText else FitBoardColors.textHint
+        )
+    }
+}
+
+@Composable
+private fun DeleteButton(onDelete: () -> Unit) {
+    Button(
+        onClick = onDelete,
+        shape = RoundedCornerShape(10.dp),
+        colors = ButtonDefaults.buttonColors(
+            containerColor = FitBoardColors.dangerBg,
+            contentColor = FitBoardColors.dangerText,
+        ),
+        elevation = ButtonDefaults.buttonElevation(0.dp)
+    ) {
+        Text("删除", fontSize = 12.sp)
+    }
+}
+
+private fun List<TrainingItemConfig>.insertTrainingItem(item: TrainingItemConfig): List<TrainingItemConfig> {
+    val insertionIndex = indexOfLast { it.category == item.category }
+    if (insertionIndex == -1) {
+        return this + item
+    }
+
+    return toMutableList().apply {
+        add(insertionIndex + 1, item)
+    }
+}
+
+private fun Int.formatTrainingDuration(): String {
+    return "${this}分钟"
 }
 
 @Composable

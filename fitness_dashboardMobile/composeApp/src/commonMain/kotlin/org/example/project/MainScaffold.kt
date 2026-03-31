@@ -34,10 +34,51 @@ import kotlinx.coroutines.delay
 
 // ─── Default Option Lists ──────────────────────────────────────────────────────
 
-internal val DEFAULT_TRAINING_OPTIONS = listOf("胸", "背", "腿", "肩", "手臂", "有氧", "休息")
 internal val DEFAULT_SUPPLEMENT_OPTIONS = listOf("蛋白粉", "肌酸", "咖啡因", "鱼油", "维生素")
 internal val DEFAULT_HOME_VISIBLE_CARDS = HomeSummaryCard.entries.toSet()
 private const val RECORD_TEXT_AUTOSAVE_DEBOUNCE_MS = 350L
+internal const val TRAINING_DURATION_STEP_MINUTES = 5
+internal const val TRAINING_DURATION_MIN_MINUTES = 0
+internal const val TRAINING_DURATION_MAX_MINUTES = 180
+
+enum class TrainingCategory(
+    val storageKey: String,
+    val title: String,
+    val defaultDurationMinutes: Int
+) {
+    TraditionalStrengthTraining(
+        storageKey = "traditionalStrengthTraining",
+        title = "传统力量训练",
+        defaultDurationMinutes = 60
+    ),
+    OtherWorkout(
+        storageKey = "otherWorkout",
+        title = "其他训练",
+        defaultDurationMinutes = 30
+    );
+
+    companion object {
+        fun fromStorageKey(storageKey: String): TrainingCategory {
+            return entries.firstOrNull { it.storageKey == storageKey } ?: OtherWorkout
+        }
+    }
+}
+
+data class TrainingItemConfig(
+    val name: String,
+    val category: TrainingCategory,
+    val defaultDurationMinutes: Int
+)
+
+internal val DEFAULT_TRAINING_ITEMS = listOf(
+    TrainingItemConfig("胸", TrainingCategory.TraditionalStrengthTraining, 60),
+    TrainingItemConfig("背", TrainingCategory.TraditionalStrengthTraining, 60),
+    TrainingItemConfig("腿", TrainingCategory.TraditionalStrengthTraining, 75),
+    TrainingItemConfig("肩", TrainingCategory.TraditionalStrengthTraining, 45),
+    TrainingItemConfig("手臂", TrainingCategory.TraditionalStrengthTraining, 45),
+    TrainingItemConfig("其他训练", TrainingCategory.OtherWorkout, 30)
+)
+internal val DEFAULT_TRAINING_OPTIONS = DEFAULT_TRAINING_ITEMS.map(TrainingItemConfig::name)
 
 // ─── Shared App State ──────────────────────────────────────────────────────────
 // Owned by MainScaffold (shared Compose layer). All screens read from / write to
@@ -65,10 +106,13 @@ data class AppUiState(
     val sleepGoalHours: Int = 8,
     val sleepGoalMinutes: Int = 0,
     val stepGoal: Int = 8000,
-    val trainingOptions: List<String> = DEFAULT_TRAINING_OPTIONS,
+    val trainingItems: List<TrainingItemConfig> = DEFAULT_TRAINING_ITEMS,
     val supplementOptions: List<String> = DEFAULT_SUPPLEMENT_OPTIONS,
     val homeVisibleCards: Set<HomeSummaryCard> = DEFAULT_HOME_VISIBLE_CARDS
-)
+) {
+    val trainingOptions: List<String>
+        get() = trainingItems.map(TrainingItemConfig::name)
+}
 
 internal fun AppUiState.hasAnyRecord(): Boolean =
     selectedTraining != null || checkedSupplements.isNotEmpty() || savedWeight != null || note.isNotBlank()
@@ -76,11 +120,135 @@ internal fun AppUiState.hasAnyRecord(): Boolean =
 internal fun AppUiState.homeCardsInDisplayOrder(): List<HomeSummaryCard> =
     HomeSummaryCard.entries.filter { it in homeVisibleCards }
 
+internal fun AppUiState.trainingItemsIn(category: TrainingCategory): List<TrainingItemConfig> =
+    trainingItems.filter { it.category == category }
+
+internal fun AppUiState.defaultTrainingDurationFor(name: String?): Int? =
+    trainingItems.firstOrNull { it.name == name }?.defaultDurationMinutes
+
 internal fun AppUiState.withAutoSavedWeight(weightInput: String): AppUiState {
     val normalizedWeight = weightInput.trim().takeIf { it.isNotEmpty() }
     return copy(
         weightInput = weightInput,
         savedWeight = normalizedWeight
+    )
+}
+
+internal fun normalizeTrainingDurationMinutes(value: Int): Int {
+    val safeValue = value.coerceIn(
+        minimumValue = TRAINING_DURATION_MIN_MINUTES,
+        maximumValue = TRAINING_DURATION_MAX_MINUTES
+    )
+    return ((safeValue + TRAINING_DURATION_STEP_MINUTES / 2) / TRAINING_DURATION_STEP_MINUTES) *
+        TRAINING_DURATION_STEP_MINUTES
+}
+
+internal fun inferTrainingCategory(name: String): TrainingCategory {
+    val normalized = name.trim()
+    if (normalized.isEmpty()) {
+        return TrainingCategory.OtherWorkout
+    }
+
+    if (normalized.contains("传统力量训练", ignoreCase = true)) {
+        return TrainingCategory.TraditionalStrengthTraining
+    }
+
+    if (normalized.contains("功能性力量训练", ignoreCase = true)) {
+        return TrainingCategory.OtherWorkout
+    }
+
+    val strengthKeywords = listOf(
+        "胸",
+        "背",
+        "腿",
+        "肩",
+        "手臂",
+        "二头",
+        "三头",
+        "臀",
+        "核心"
+    )
+
+    if (strengthKeywords.any { normalized.contains(it, ignoreCase = true) }) {
+        return TrainingCategory.TraditionalStrengthTraining
+    }
+
+    return if (normalized.contains("力量", ignoreCase = true) &&
+        !normalized.contains("传统力量训练", ignoreCase = true)
+    ) {
+        TrainingCategory.TraditionalStrengthTraining
+    } else {
+        TrainingCategory.OtherWorkout
+    }
+}
+
+internal fun defaultTrainingDurationFor(
+    name: String,
+    category: TrainingCategory = inferTrainingCategory(name)
+): Int {
+    val normalized = name.trim()
+    val predefined = when {
+        normalized == "胸" || normalized.contains("胸") -> 60
+        normalized == "背" || normalized.contains("背") -> 60
+        normalized == "腿" || normalized.contains("腿") -> 75
+        normalized == "肩" || normalized.contains("肩") -> 45
+        normalized == "手臂" || normalized.contains("手臂") ||
+            normalized.contains("二头") || normalized.contains("三头") -> 45
+        normalized.contains("传统力量训练", ignoreCase = true) -> 60
+        normalized.contains("跑", ignoreCase = true) -> 30
+        normalized.contains("骑", ignoreCase = true) -> 45
+        normalized.contains("游泳", ignoreCase = true) -> 30
+        normalized.contains("HIIT", ignoreCase = true) -> 20
+        normalized.contains("步行", ignoreCase = true) ||
+            normalized.contains("走路", ignoreCase = true) -> 30
+        normalized.contains("功能性力量训练", ignoreCase = true) -> 45
+        normalized.contains("有氧", ignoreCase = true) -> 30
+        normalized.contains("休息", ignoreCase = true) -> 0
+        normalized.contains("其他训练", ignoreCase = true) -> 30
+        else -> category.defaultDurationMinutes
+    }
+
+    return normalizeTrainingDurationMinutes(predefined)
+}
+
+internal fun sanitizeTrainingItems(
+    values: List<TrainingItemConfig>,
+    fallback: List<TrainingItemConfig> = DEFAULT_TRAINING_ITEMS
+): List<TrainingItemConfig> {
+    val safeValues = values
+        .mapNotNull { item ->
+            val safeName = item.name.trim().takeIf { it.isNotEmpty() } ?: return@mapNotNull null
+            TrainingItemConfig(
+                name = safeName,
+                category = item.category,
+                defaultDurationMinutes = normalizeTrainingDurationMinutes(item.defaultDurationMinutes)
+            )
+        }
+        .distinctBy(TrainingItemConfig::name)
+
+    if (safeValues.isEmpty()) {
+        return fallback
+    }
+
+    val safeStrengthItems = safeValues
+        .filter { it.category == TrainingCategory.TraditionalStrengthTraining }
+        .ifEmpty { fallback.filter { it.category == TrainingCategory.TraditionalStrengthTraining } }
+
+    val otherDurationMinutes = safeValues
+        .firstOrNull { it.category == TrainingCategory.OtherWorkout && it.name == "其他训练" }
+        ?.defaultDurationMinutes
+        ?: safeValues
+            .firstOrNull { it.category == TrainingCategory.OtherWorkout }
+            ?.defaultDurationMinutes
+        ?: fallback
+            .firstOrNull { it.category == TrainingCategory.OtherWorkout }
+            ?.defaultDurationMinutes
+        ?: TrainingCategory.OtherWorkout.defaultDurationMinutes
+
+    return safeStrengthItems + TrainingItemConfig(
+        name = "其他训练",
+        category = TrainingCategory.OtherWorkout,
+        defaultDurationMinutes = normalizeTrainingDurationMinutes(otherDurationMinutes)
     )
 }
 
@@ -118,7 +286,7 @@ fun MainScaffold() {
         appState.sleepGoalHours,
         appState.sleepGoalMinutes,
         appState.stepGoal,
-        appState.trainingOptions,
+        appState.trainingItems,
         appState.supplementOptions,
         appState.homeVisibleCards
     ) {
@@ -138,6 +306,19 @@ fun MainScaffold() {
         healthSummaryState.hasTodaySteps,
         healthSummaryState.sleepDurationHours,
         healthSummaryState.hasSleepDuration,
+        healthSummaryState.workoutType,
+        healthSummaryState.workoutDurationMinutes,
+        healthSummaryState.hasWorkout,
+        healthSummaryState.workoutStartDateIso,
+        healthSummaryState.workoutEndDateIso,
+        healthSummaryState.workoutCaloriesKilocalories,
+        healthSummaryState.hasWorkoutCalories,
+        healthSummaryState.workoutDistanceKilometers,
+        healthSummaryState.hasWorkoutDistance,
+        healthSummaryState.scorePrimaryWorkoutType,
+        healthSummaryState.scorePrimaryWorkoutDurationMinutes,
+        healthSummaryState.scoreAdditionalWorkoutDurationMinutes,
+        healthSummaryState.scoreAdditionalWorkoutsRaw,
         healthSummaryState.lastUpdatedAt
     ) {
         if (hasLoadedPersistence) {
@@ -191,6 +372,7 @@ fun MainScaffold() {
                         )
                         AppScreen.Records -> RecordsScreen(
                             state = appState,
+                            healthState = healthSummaryState,
                             today = today,
                             onWeightChange = { input ->
                                 appState = appState.withAutoSavedWeight(input)

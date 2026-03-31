@@ -5,11 +5,18 @@ internal const val FIT_BOARD_CONFIG_PATH = "$FIT_BOARD_STORAGE_ROOT/config.json"
 internal const val FIT_BOARD_RECORDS_DIR = "$FIT_BOARD_STORAGE_ROOT/records"
 private const val FIT_BOARD_SCHEMA_VERSION = 1
 
+internal data class StoredTrainingItem(
+    val name: String,
+    val category: String = TrainingCategory.OtherWorkout.storageKey,
+    val defaultDurationMinutes: Int = TrainingCategory.OtherWorkout.defaultDurationMinutes
+)
+
 internal data class StoredAppConfig(
     val schemaVersion: Int = FIT_BOARD_SCHEMA_VERSION,
     val themeMode: String = AppThemeMode.SoftGreen.name,
     val sleepGoalMinutes: Int = 8 * 60,
     val stepGoal: Int = 8000,
+    val trainingItems: List<StoredTrainingItem> = DEFAULT_TRAINING_ITEMS.map(TrainingItemConfig::toStoredItem),
     val trainingOptions: List<String> = DEFAULT_TRAINING_OPTIONS,
     val supplementOptions: List<String> = DEFAULT_SUPPLEMENT_OPTIONS,
     val homeVisibleCards: List<String> = HomeSummaryCard.entries.map(HomeSummaryCard::name)
@@ -31,6 +38,10 @@ internal data class StoredHealthSummary(
     val hasWorkoutCalories: Boolean = false,
     val workoutDistanceKilometers: Double = 0.0,
     val hasWorkoutDistance: Boolean = false,
+    val scorePrimaryWorkoutType: String = "",
+    val scorePrimaryWorkoutDurationMinutes: Double = 0.0,
+    val scoreAdditionalWorkoutDurationMinutes: Double = 0.0,
+    val scoreAdditionalWorkoutsRaw: String = "",
     val lastUpdatedAt: String = ""
 )
 
@@ -115,12 +126,18 @@ internal fun storageDateKey(dateInfo: DateInfo): String =
     }
 
 private fun StoredAppConfig.sanitize(): StoredAppConfig {
+    val safeTrainingItems = sanitizeStoredTrainingItems(
+        trainingItems = trainingItems,
+        legacyOptions = trainingOptions
+    )
+
     return copy(
         schemaVersion = FIT_BOARD_SCHEMA_VERSION,
         themeMode = parseThemeMode(themeMode).name,
         sleepGoalMinutes = sleepGoalMinutes.coerceIn(0, 24 * 60),
         stepGoal = stepGoal.coerceAtLeast(0),
-        trainingOptions = sanitizeOptions(trainingOptions, DEFAULT_TRAINING_OPTIONS),
+        trainingItems = safeTrainingItems,
+        trainingOptions = safeTrainingItems.map(StoredTrainingItem::name),
         supplementOptions = sanitizeOptions(supplementOptions, DEFAULT_SUPPLEMENT_OPTIONS),
         homeVisibleCards = sanitizeHomeVisibleCards(homeVisibleCards)
     )
@@ -130,11 +147,25 @@ private fun StoredDailyRecord.sanitize(
     todayKey: String,
     config: StoredAppConfig
 ): StoredDailyRecord {
+    val trainingNames = config.trainingItems.map(StoredTrainingItem::name).toSet()
+    val otherTrainingName = config.trainingItems
+        .firstOrNull { it.category == TrainingCategory.OtherWorkout.storageKey }
+        ?.name
+
     return copy(
         schemaVersion = FIT_BOARD_SCHEMA_VERSION,
         date = todayKey,
         weight = weight?.trim()?.takeIf { it.isNotEmpty() },
-        selectedTraining = selectedTraining?.takeIf { it in config.trainingOptions },
+        selectedTraining = selectedTraining
+            ?.trim()
+            ?.takeIf { it.isNotEmpty() }
+            ?.let { training ->
+                when {
+                    training in trainingNames -> training
+                    inferTrainingCategory(training) == TrainingCategory.OtherWorkout -> otherTrainingName
+                    else -> null
+                }
+            },
         selectedSupplements = selectedSupplements
             .map { it.trim() }
             .filter { it.isNotEmpty() && it in config.supplementOptions }
@@ -162,12 +193,16 @@ private fun StoredDailyRecord.sanitizeForHistory(todayKey: String): StoredDailyR
 private fun StoredHealthSummary.sanitize(): StoredHealthSummary {
     return copy(
         authorizationState = parseAuthorizationState(authorizationState).name,
-        workoutType = workoutType.trim(),
+        workoutType = canonicalizeWorkoutTypeLabel(workoutType),
         workoutDurationMinutes = workoutDurationMinutes.coerceAtLeast(0.0),
         workoutStartDateIso = workoutStartDateIso.trim(),
         workoutEndDateIso = workoutEndDateIso.trim(),
         workoutCaloriesKilocalories = workoutCaloriesKilocalories.coerceAtLeast(0.0),
-        workoutDistanceKilometers = workoutDistanceKilometers.coerceAtLeast(0.0)
+        workoutDistanceKilometers = workoutDistanceKilometers.coerceAtLeast(0.0),
+        scorePrimaryWorkoutType = canonicalizeWorkoutTypeLabel(scorePrimaryWorkoutType),
+        scorePrimaryWorkoutDurationMinutes = scorePrimaryWorkoutDurationMinutes.coerceAtLeast(0.0),
+        scoreAdditionalWorkoutDurationMinutes = scoreAdditionalWorkoutDurationMinutes.coerceAtLeast(0.0),
+        scoreAdditionalWorkoutsRaw = scoreAdditionalWorkoutsRaw.trim()
     )
 }
 
@@ -176,7 +211,8 @@ private fun AppUiState.toStoredConfig(): StoredAppConfig {
         themeMode = themeMode.name,
         sleepGoalMinutes = sleepGoalHours * 60 + sleepGoalMinutes,
         stepGoal = stepGoal,
-        trainingOptions = sanitizeOptions(trainingOptions, DEFAULT_TRAINING_OPTIONS),
+        trainingItems = sanitizeTrainingItems(trainingItems).map(TrainingItemConfig::toStoredItem),
+        trainingOptions = trainingOptions,
         supplementOptions = sanitizeOptions(supplementOptions, DEFAULT_SUPPLEMENT_OPTIONS),
         homeVisibleCards = homeCardsInDisplayOrder().map(HomeSummaryCard::name)
     )
@@ -215,7 +251,7 @@ private fun StoredDailyRecord.toAppUiState(config: StoredAppConfig): AppUiState 
         sleepGoalHours = sleepGoalHours,
         sleepGoalMinutes = sleepGoalMinutes,
         stepGoal = config.stepGoal,
-        trainingOptions = config.trainingOptions,
+        trainingItems = config.trainingItems.map(StoredTrainingItem::toTrainingItemConfig),
         supplementOptions = config.supplementOptions,
         homeVisibleCards = parseHomeVisibleCards(config.homeVisibleCards)
     )
@@ -238,6 +274,10 @@ private fun HealthSummaryUiState.toStoredSummary(): StoredHealthSummary {
         hasWorkoutCalories = hasWorkoutCalories,
         workoutDistanceKilometers = workoutDistanceKilometers,
         hasWorkoutDistance = hasWorkoutDistance,
+        scorePrimaryWorkoutType = scorePrimaryWorkoutType,
+        scorePrimaryWorkoutDurationMinutes = scorePrimaryWorkoutDurationMinutes,
+        scoreAdditionalWorkoutDurationMinutes = scoreAdditionalWorkoutDurationMinutes,
+        scoreAdditionalWorkoutsRaw = scoreAdditionalWorkoutsRaw,
         lastUpdatedAt = lastUpdatedAt
     )
 }
@@ -259,6 +299,10 @@ internal fun StoredHealthSummary.toUiState(): HealthSummaryUiState {
         hasWorkoutCalories = hasWorkoutCalories,
         workoutDistanceKilometers = workoutDistanceKilometers,
         hasWorkoutDistance = hasWorkoutDistance,
+        scorePrimaryWorkoutType = scorePrimaryWorkoutType,
+        scorePrimaryWorkoutDurationMinutes = scorePrimaryWorkoutDurationMinutes,
+        scoreAdditionalWorkoutDurationMinutes = scoreAdditionalWorkoutDurationMinutes,
+        scoreAdditionalWorkoutsRaw = scoreAdditionalWorkoutsRaw,
         lastUpdatedAt = lastUpdatedAt
     )
 }
@@ -270,6 +314,52 @@ private fun sanitizeOptions(values: List<String>, fallback: List<String>): List<
         .distinct()
 
     return if (safeValues.isEmpty()) fallback else safeValues
+}
+
+private fun sanitizeStoredTrainingItems(
+    trainingItems: List<StoredTrainingItem>,
+    legacyOptions: List<String>
+): List<StoredTrainingItem> {
+    val runtimeItems = if (trainingItems.isNotEmpty()) {
+        trainingItems.map(StoredTrainingItem::toTrainingItemConfig)
+    } else {
+        legacyOptions.map { option ->
+            val category = inferTrainingCategory(option)
+            TrainingItemConfig(
+                name = option,
+                category = category,
+                defaultDurationMinutes = defaultTrainingDurationFor(option, category)
+            )
+        }
+    }
+
+    return sanitizeTrainingItems(runtimeItems).map(TrainingItemConfig::toStoredItem)
+}
+
+private fun canonicalizeWorkoutTypeLabel(value: String): String {
+    val normalized = value.trim()
+    if (normalized.isEmpty()) {
+        return ""
+    }
+
+    return normalized
+}
+
+private fun TrainingItemConfig.toStoredItem(): StoredTrainingItem {
+    return StoredTrainingItem(
+        name = name,
+        category = category.storageKey,
+        defaultDurationMinutes = defaultDurationMinutes
+    )
+}
+
+private fun StoredTrainingItem.toTrainingItemConfig(): TrainingItemConfig {
+    val parsedCategory = TrainingCategory.fromStorageKey(category)
+    return TrainingItemConfig(
+        name = name,
+        category = parsedCategory,
+        defaultDurationMinutes = defaultDurationMinutes
+    )
 }
 
 private fun parseThemeMode(name: String): AppThemeMode {

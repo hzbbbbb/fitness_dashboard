@@ -115,6 +115,7 @@ private fun parseConfig(json: Map<*, *>): StoredAppConfig {
         themeMode = json.stringValue("themeMode", AppThemeMode.SoftGreen.name),
         sleepGoalMinutes = json.intValue("sleepGoalMinutes", 8 * 60),
         stepGoal = json.intValue("stepGoal", 8000),
+        trainingItems = json.trainingItemList("trainingItems"),
         trainingOptions = json.stringList("trainingOptions"),
         supplementOptions = json.stringList("supplementOptions"),
         homeVisibleCards = json.stringList("homeVisibleCards")
@@ -151,6 +152,16 @@ private fun parseDailyRecord(json: Map<*, *>, fallbackDate: String): StoredDaily
             hasWorkoutCalories = healthJson?.boolValue("hasWorkoutCalories", false) ?: false,
             workoutDistanceKilometers = healthJson?.doubleValue("workoutDistanceKilometers", 0.0) ?: 0.0,
             hasWorkoutDistance = healthJson?.boolValue("hasWorkoutDistance", false) ?: false,
+            scorePrimaryWorkoutType = healthJson?.stringValue("scorePrimaryWorkoutType", "") ?: "",
+            scorePrimaryWorkoutDurationMinutes = healthJson?.doubleValue(
+                "scorePrimaryWorkoutDurationMinutes",
+                0.0
+            ) ?: 0.0,
+            scoreAdditionalWorkoutDurationMinutes = healthJson?.doubleValue(
+                "scoreAdditionalWorkoutDurationMinutes",
+                0.0
+            ) ?: 0.0,
+            scoreAdditionalWorkoutsRaw = healthJson?.stringValue("scoreAdditionalWorkoutsRaw", "") ?: "",
             lastUpdatedAt = healthJson?.stringValue("lastUpdatedAt", "") ?: ""
         )
     )
@@ -162,6 +173,7 @@ private fun StoredAppConfig.toJsonObject(): Map<String, Any?> {
         "themeMode" to themeMode,
         "sleepGoalMinutes" to sleepGoalMinutes,
         "stepGoal" to stepGoal,
+        "trainingItems" to trainingItems.map(StoredTrainingItem::toJsonObject),
         "trainingOptions" to trainingOptions,
         "supplementOptions" to supplementOptions,
         "homeVisibleCards" to homeVisibleCards
@@ -193,6 +205,10 @@ private fun StoredDailyRecord.toJsonObject(): Map<String, Any?> {
             "hasWorkoutCalories" to healthSummary.hasWorkoutCalories,
             "workoutDistanceKilometers" to healthSummary.workoutDistanceKilometers,
             "hasWorkoutDistance" to healthSummary.hasWorkoutDistance,
+            "scorePrimaryWorkoutType" to healthSummary.scorePrimaryWorkoutType,
+            "scorePrimaryWorkoutDurationMinutes" to healthSummary.scorePrimaryWorkoutDurationMinutes,
+            "scoreAdditionalWorkoutDurationMinutes" to healthSummary.scoreAdditionalWorkoutDurationMinutes,
+            "scoreAdditionalWorkoutsRaw" to healthSummary.scoreAdditionalWorkoutsRaw,
             "lastUpdatedAt" to healthSummary.lastUpdatedAt
         )
     )
@@ -235,8 +251,36 @@ private fun Map<*, *>.stringList(key: String): List<String> {
     return values.mapNotNull { (it as? String)?.trim()?.takeIf(String::isNotEmpty) }
 }
 
+private fun Map<*, *>.trainingItemList(key: String): List<StoredTrainingItem> {
+    val values = this[key] as? List<*> ?: return emptyList()
+    return values.mapNotNull { value ->
+        val item = value as? Map<*, *> ?: return@mapNotNull null
+        val name = item.stringValue("name", "").trim()
+        if (name.isEmpty()) {
+            return@mapNotNull null
+        }
+
+        StoredTrainingItem(
+            name = name,
+            category = item.stringValue("category", TrainingCategory.OtherWorkout.storageKey),
+            defaultDurationMinutes = item.intValue(
+                "defaultDurationMinutes",
+                TrainingCategory.OtherWorkout.defaultDurationMinutes
+            )
+        )
+    }
+}
+
 private fun Map<*, *>.mapValue(key: String): Map<*, *>? {
     return this[key] as? Map<*, *>
+}
+
+private fun StoredTrainingItem.toJsonObject(): Map<String, Any?> {
+    return mapOf(
+        "name" to name,
+        "category" to category,
+        "defaultDurationMinutes" to defaultDurationMinutes
+    )
 }
 
 private fun recordPath(date: String): String = "$FIT_BOARD_RECORDS_DIR/$date.json"

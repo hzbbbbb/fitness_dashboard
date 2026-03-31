@@ -76,7 +76,7 @@ final class HealthKitManager: ObservableObject {
         var hasStepData = false
         var sleepHours = 0.0
         var hasSleepData = false
-        var latestWorkout = TodayWorkoutSnapshot.empty
+        var workoutSummary = TodayWorkoutSummary.empty
         var hasWorkoutData = false
         var failureMessage: String?
         var hasAuthorizationDenied = false
@@ -118,10 +118,10 @@ final class HealthKitManager: ObservableObject {
         }
 
         group.enter()
-        fetchTodayLatestWorkout { result in
+        fetchTodayWorkoutSummary { result in
             switch result {
-            case .success(let workout):
-                latestWorkout = workout
+            case .success(let summary):
+                workoutSummary = summary
                 hasWorkoutData = true
             case .failure(let error):
                 if self.isAuthorizationDeniedError(error) {
@@ -162,15 +162,19 @@ final class HealthKitManager: ObservableObject {
                 hasTodaySteps: hasStepData,
                 sleepDurationHours: sleepHours,
                 hasSleepDuration: hasSleepData,
-                workoutType: latestWorkout.typeLabel,
-                workoutDurationMinutes: latestWorkout.durationMinutes,
+                workoutType: workoutSummary.latestWorkout.typeLabel,
+                workoutDurationMinutes: workoutSummary.latestWorkout.durationMinutes,
                 hasWorkout: hasWorkoutData,
-                workoutStartDateIso: latestWorkout.startDateIso,
-                workoutEndDateIso: latestWorkout.endDateIso,
-                workoutCaloriesKilocalories: latestWorkout.caloriesKilocalories,
-                hasWorkoutCalories: latestWorkout.hasCalories,
-                workoutDistanceKilometers: latestWorkout.distanceKilometers,
-                hasWorkoutDistance: latestWorkout.hasDistance,
+                workoutStartDateIso: workoutSummary.latestWorkout.startDateIso,
+                workoutEndDateIso: workoutSummary.latestWorkout.endDateIso,
+                workoutCaloriesKilocalories: workoutSummary.latestWorkout.caloriesKilocalories,
+                hasWorkoutCalories: workoutSummary.latestWorkout.hasCalories,
+                workoutDistanceKilometers: workoutSummary.latestWorkout.distanceKilometers,
+                hasWorkoutDistance: workoutSummary.latestWorkout.hasDistance,
+                scorePrimaryWorkoutType: workoutSummary.primaryWorkout.typeLabel,
+                scorePrimaryWorkoutDurationMinutes: workoutSummary.primaryWorkout.durationMinutes,
+                scoreAdditionalWorkoutDurationMinutes: workoutSummary.additionalWorkoutDurationMinutes,
+                scoreAdditionalWorkoutsRaw: workoutSummary.additionalWorkoutsRaw,
                 lastUpdatedAt: formatter.string(from: Date()),
                 statusMessage: message
             )
@@ -261,8 +265,8 @@ final class HealthKitManager: ObservableObject {
         healthStore.execute(query)
     }
 
-    private func fetchTodayLatestWorkout(
-        completion: @escaping (HealthFetchResult<TodayWorkoutSnapshot>) -> Void
+    private func fetchTodayWorkoutSummary(
+        completion: @escaping (HealthFetchResult<TodayWorkoutSummary>) -> Void
     ) {
         let now = Date()
         let startOfDay = Calendar.current.startOfDay(for: now)
@@ -272,7 +276,7 @@ final class HealthKitManager: ObservableObject {
         let query = HKSampleQuery(
             sampleType: workoutType,
             predicate: predicate,
-            limit: 1,
+            limit: HKObjectQueryNoLimit,
             sortDescriptors: sortDescriptors
         ) { _, samples, error in
             if let error {
@@ -280,25 +284,37 @@ final class HealthKitManager: ObservableObject {
                 return
             }
 
-            guard let workout = (samples as? [HKWorkout])?.first else {
+            guard let workouts = samples as? [HKWorkout], !workouts.isEmpty else {
                 completion(.noData)
                 return
             }
 
-            let calories = workout.totalEnergyBurned?.doubleValue(for: HKUnit.kilocalorie())
-            let distanceInKilometers = workout.totalDistance?.doubleValue(for: HKUnit.meter()) ?? 0.0
+            let latestWorkout = workouts[0]
+            let primaryWorkout = workouts.max { lhs, rhs in
+                if lhs.duration == rhs.duration {
+                    return lhs.endDate < rhs.endDate
+                }
+
+                return lhs.duration < rhs.duration
+            } ?? latestWorkout
+            let totalWorkoutDurationMinutes = workouts.reduce(0.0) { partialResult, workout in
+                partialResult + workout.duration / 60.0
+            }
+            let additionalWorkoutDurationMinutes = max(
+                totalWorkoutDurationMinutes - (primaryWorkout.duration / 60.0),
+                0.0
+            )
+            let additionalWorkoutSnapshots = workouts
+                .filter { $0.uuid != primaryWorkout.uuid }
+                .map { Self.workoutSnapshot(from: $0) }
 
             completion(
                 .success(
-                    TodayWorkoutSnapshot(
-                        typeLabel: Self.workoutLabel(for: workout.workoutActivityType),
-                        durationMinutes: workout.duration / 60.0,
-                        startDateIso: Self.iso8601String(from: workout.startDate),
-                        endDateIso: Self.iso8601String(from: workout.endDate),
-                        caloriesKilocalories: calories ?? 0.0,
-                        hasCalories: calories != nil,
-                        distanceKilometers: distanceInKilometers / 1000.0,
-                        hasDistance: workout.totalDistance != nil
+                    TodayWorkoutSummary(
+                        latestWorkout: Self.workoutSnapshot(from: latestWorkout),
+                        primaryWorkout: Self.workoutSnapshot(from: primaryWorkout),
+                        additionalWorkoutDurationMinutes: additionalWorkoutDurationMinutes,
+                        additionalWorkoutsRaw: Self.encodeWorkoutSnapshots(additionalWorkoutSnapshots)
                     )
                 )
             )
@@ -369,11 +385,31 @@ final class HealthKitManager: ObservableObject {
             return "徒步"
         case .elliptical:
             return "椭圆机"
-        case .other:
-            return "其他训练"
         default:
             return "其他训练"
         }
+    }
+
+    nonisolated private static func workoutSnapshot(from workout: HKWorkout) -> TodayWorkoutSnapshot {
+        let calories = workout.totalEnergyBurned?.doubleValue(for: HKUnit.kilocalorie())
+        let distanceInKilometers = workout.totalDistance?.doubleValue(for: HKUnit.meter()) ?? 0.0
+
+        return TodayWorkoutSnapshot(
+            typeLabel: workoutLabel(for: workout.workoutActivityType),
+            durationMinutes: workout.duration / 60.0,
+            startDateIso: iso8601String(from: workout.startDate),
+            endDateIso: iso8601String(from: workout.endDate),
+            caloriesKilocalories: calories ?? 0.0,
+            hasCalories: calories != nil,
+            distanceKilometers: distanceInKilometers / 1000.0,
+            hasDistance: workout.totalDistance != nil
+        )
+    }
+
+    nonisolated private static func encodeWorkoutSnapshots(_ workouts: [TodayWorkoutSnapshot]) -> String {
+        return workouts.map { workout in
+            "\(workout.typeLabel)\t\(workout.durationMinutes)"
+        }.joined(separator: "\n")
     }
 
     nonisolated private static func iso8601String(from date: Date) -> String {
@@ -418,5 +454,19 @@ private struct TodayWorkoutSnapshot {
         hasCalories: false,
         distanceKilometers: 0.0,
         hasDistance: false
+    )
+}
+
+private struct TodayWorkoutSummary {
+    let latestWorkout: TodayWorkoutSnapshot
+    let primaryWorkout: TodayWorkoutSnapshot
+    let additionalWorkoutDurationMinutes: Double
+    let additionalWorkoutsRaw: String
+
+    static let empty = TodayWorkoutSummary(
+        latestWorkout: .empty,
+        primaryWorkout: .empty,
+        additionalWorkoutDurationMinutes: 0.0,
+        additionalWorkoutsRaw: ""
     )
 }

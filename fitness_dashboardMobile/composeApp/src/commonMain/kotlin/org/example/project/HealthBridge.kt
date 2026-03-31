@@ -31,7 +31,16 @@ data class HealthSummaryUiState(
     val hasWorkoutCalories: Boolean = false,
     val workoutDistanceKilometers: Double = 0.0,
     val hasWorkoutDistance: Boolean = false,
+    val scorePrimaryWorkoutType: String = "",
+    val scorePrimaryWorkoutDurationMinutes: Double = 0.0,
+    val scoreAdditionalWorkoutDurationMinutes: Double = 0.0,
+    val scoreAdditionalWorkoutsRaw: String = "",
     val lastUpdatedAt: String = ""
+)
+
+internal data class WorkoutDisplayEntry(
+    val type: String,
+    val durationMinutes: Double
 )
 
 object HealthSummaryBridge {
@@ -103,6 +112,10 @@ fun updateHealthAuthorized(
     hasWorkoutCalories: Boolean,
     workoutDistanceKilometers: Double,
     hasWorkoutDistance: Boolean,
+    scorePrimaryWorkoutType: String,
+    scorePrimaryWorkoutDurationMinutes: Double,
+    scoreAdditionalWorkoutDurationMinutes: Double,
+    scoreAdditionalWorkoutsRaw: String,
     lastUpdatedAt: String,
     statusMessage: String = "Apple 健康数据已更新"
 ) {
@@ -123,12 +136,47 @@ fun updateHealthAuthorized(
             hasWorkoutCalories = hasWorkoutCalories,
             workoutDistanceKilometers = workoutDistanceKilometers,
             hasWorkoutDistance = hasWorkoutDistance,
+            scorePrimaryWorkoutType = scorePrimaryWorkoutType,
+            scorePrimaryWorkoutDurationMinutes = scorePrimaryWorkoutDurationMinutes,
+            scoreAdditionalWorkoutDurationMinutes = scoreAdditionalWorkoutDurationMinutes,
+            scoreAdditionalWorkoutsRaw = scoreAdditionalWorkoutsRaw,
             lastUpdatedAt = lastUpdatedAt
         )
     )
 }
 
 internal fun currentHealthSummaryState(): HealthSummaryUiState = HealthSummaryBridge.uiState
+
+internal fun HealthSummaryUiState.primaryWorkoutDisplayType(): String =
+    scorePrimaryWorkoutType.trim().ifEmpty { workoutType.trim() }
+
+internal fun HealthSummaryUiState.primaryWorkoutDisplayDurationMinutes(): Double =
+    when {
+        scorePrimaryWorkoutDurationMinutes > 0.0 -> scorePrimaryWorkoutDurationMinutes
+        else -> workoutDurationMinutes.coerceAtLeast(0.0)
+    }
+
+internal fun HealthSummaryUiState.additionalWorkoutEntries(): List<WorkoutDisplayEntry> {
+    return scoreAdditionalWorkoutsRaw
+        .lineSequence()
+        .map(String::trim)
+        .filter(String::isNotEmpty)
+        .mapNotNull { line ->
+            val parts = line.split('\t', limit = 2)
+            val type = parts.firstOrNull()?.trim().orEmpty()
+            val durationMinutes = parts.getOrNull(1)?.toDoubleOrNull()?.coerceAtLeast(0.0) ?: 0.0
+            type.takeIf { it.isNotEmpty() }?.let {
+                WorkoutDisplayEntry(type = it, durationMinutes = durationMinutes)
+            }
+        }
+        .toList()
+}
+
+internal fun HealthSummaryUiState.additionalWorkoutCount(): Int =
+    additionalWorkoutEntries().size
+
+internal fun HealthSummaryUiState.hasMultipleWorkouts(): Boolean =
+    additionalWorkoutCount() > 0
 
 internal fun formatSleepDuration(hours: Double): String {
     val totalMinutes = (hours * 60.0).roundToInt()

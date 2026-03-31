@@ -535,13 +535,58 @@ private fun HomeSummaryCardBlock(
             }
         )
 
-        HomeSummaryCard.Training -> HomeStatusCard(
-            label = "训练",
-            title = "训练情况",
-            primary = state.selectedTraining ?: "今日未记录",
-            secondary = null
+        HomeSummaryCard.Training -> run {
+            val summary = homeTrainingSummary(
+                state = state,
+                healthState = healthState
+            )
+            HomeStatusCard(
+                label = "训练",
+                title = "训练情况",
+                primary = summary.primary,
+                secondary = summary.secondary
+            )
+        }
+    }
+}
+
+private data class HomeTrainingSummary(
+    val primary: String,
+    val secondary: String?
+)
+
+private fun homeTrainingSummary(
+    state: AppUiState,
+    healthState: HealthSummaryUiState
+): HomeTrainingSummary {
+    if (healthState.hasWorkout && healthState.primaryWorkoutDisplayType().isNotBlank()) {
+        val primaryWorkoutType = healthState.primaryWorkoutDisplayType()
+        val primaryText = if (primaryWorkoutType == "传统力量训练") {
+            val strengthNames = state.trainingItemsIn(TrainingCategory.TraditionalStrengthTraining)
+                .map(TrainingItemConfig::name)
+                .toSet()
+            val selectedStrengthDetail = state.selectedTraining?.takeIf { it in strengthNames }
+            selectedStrengthDetail?.let { detail ->
+                "传统力量训练：$detail"
+            } ?: "传统力量训练"
+        } else {
+            primaryWorkoutType
+        }
+
+        val secondaryText = healthState.additionalWorkoutCount()
+            .takeIf { it > 0 }
+            ?.let { count -> "另有 $count 项训练" }
+
+        return HomeTrainingSummary(
+            primary = primaryText,
+            secondary = secondaryText
         )
     }
+
+    return HomeTrainingSummary(
+        primary = state.selectedTraining ?: "今日未记录",
+        secondary = null
+    )
 }
 
 @Composable
