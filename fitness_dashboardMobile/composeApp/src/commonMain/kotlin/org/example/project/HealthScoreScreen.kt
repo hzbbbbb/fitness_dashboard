@@ -49,37 +49,24 @@ fun HealthScoreScreen(
     ) {
         Spacer(Modifier.height(12.dp))
 
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 4.dp)
-        ) {
+        Column(modifier = Modifier.padding(horizontal = 4.dp)) {
             Text(
                 text = "健康评分",
-                fontSize = 26.sp,
+                fontSize = 30.sp,
                 fontWeight = FontWeight.SemiBold,
                 color = FitBoardColors.textPrimary
             )
-            Spacer(Modifier.height(3.dp))
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    text = "当天记录与健康数据构成",
-                    fontSize = 14.sp,
-                    color = FitBoardColors.textSecondary
-                )
-                Text(
-                    text = today,
-                    fontSize = 13.sp,
-                    color = FitBoardColors.textHint
-                )
+                Spacer(Modifier.weight(1f))
+                ScoreTag(text = today)
             }
         }
 
-        Spacer(Modifier.height(16.dp))
+        Spacer(Modifier.height(18.dp))
 
         TotalScoreCard(scoreState = scoreState, today = today)
         Spacer(Modifier.height(12.dp))
@@ -88,20 +75,6 @@ fun HealthScoreScreen(
         Spacer(Modifier.height(12.dp))
 
         ScoreCompositionCard(scoreState = scoreState)
-        Spacer(Modifier.height(12.dp))
-
-        FitCard {
-            CardLabel("说明")
-            Spacer(Modifier.height(2.dp))
-            CardTitle("评分说明")
-            Spacer(Modifier.height(12.dp))
-            Text(
-                text = "评分用于展示当天记录与健康数据构成。",
-                fontSize = 13.sp,
-                lineHeight = 20.sp,
-                color = FitBoardColors.textSecondary
-            )
-        }
 
         Spacer(Modifier.height(28.dp))
     }
@@ -114,9 +87,9 @@ private fun TotalScoreCard(
 ) {
     FitCard {
         CardLabel("总分")
-        Spacer(Modifier.height(2.dp))
+        Spacer(Modifier.height(4.dp))
         CardTitle("今日健康评分")
-        Spacer(Modifier.height(14.dp))
+        Spacer(Modifier.height(18.dp))
 
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -126,7 +99,7 @@ private fun TotalScoreCard(
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 Text(
                     text = formatScore(scoreState.totalScore),
-                    fontSize = 42.sp,
+                    fontSize = 44.sp,
                     fontWeight = FontWeight.SemiBold,
                     color = FitBoardColors.textPrimary
                 )
@@ -144,11 +117,12 @@ private fun TotalScoreCard(
                 ScoreTag(text = scoreState.levelLabel)
                 Text(
                     text = today,
-                    fontSize = 13.sp,
+                    fontSize = 12.sp,
                     color = FitBoardColors.textHint
                 )
             }
         }
+
     }
 }
 
@@ -156,9 +130,9 @@ private fun TotalScoreCard(
 private fun DimensionScoresCard(scoreState: HealthScorePageState) {
     FitCard {
         CardLabel("维度")
-        Spacer(Modifier.height(2.dp))
+        Spacer(Modifier.height(4.dp))
         CardTitle("四维分数")
-        Spacer(Modifier.height(12.dp))
+        Spacer(Modifier.height(14.dp))
 
         scoreState.items.forEachIndexed { index, item ->
             ScoreDimensionRow(item = item)
@@ -174,8 +148,8 @@ private fun ScoreDimensionRow(item: HealthScoreItemState) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(16.dp))
-            .border(1.dp, FitBoardColors.innerPanelBorder, RoundedCornerShape(16.dp))
+            .clip(RoundedCornerShape(18.dp))
+            .border(1.dp, FitBoardColors.innerPanelBorder, RoundedCornerShape(18.dp))
             .background(FitBoardColors.innerPanelBg)
             .padding(horizontal = 14.dp, vertical = 14.dp)
     ) {
@@ -200,22 +174,22 @@ private fun ScoreDimensionRow(item: HealthScoreItemState) {
             }
 
             Text(
-                text = item.summary,
-                fontSize = 13.sp,
-                lineHeight = 19.sp,
-                color = FitBoardColors.textSecondary
-            )
+                    text = item.summary,
+                    fontSize = 13.sp,
+                    lineHeight = 20.sp,
+                    color = FitBoardColors.textSecondary
+                )
+            }
         }
-    }
 }
 
 @Composable
 private fun ScoreCompositionCard(scoreState: HealthScorePageState) {
     FitCard {
         CardLabel("构成")
-        Spacer(Modifier.height(2.dp))
+        Spacer(Modifier.height(4.dp))
         CardTitle("评分构成")
-        Spacer(Modifier.height(12.dp))
+        Spacer(Modifier.height(14.dp))
 
         scoreState.items.forEachIndexed { index, item ->
             ScoreCompositionRow(
@@ -237,14 +211,20 @@ private fun ScoreCompositionRow(
     value: String
 ) {
     Row(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(16.dp))
+            .border(1.dp, FitBoardColors.innerPanelBorder, RoundedCornerShape(16.dp))
+            .background(FitBoardColors.innerPanelBg)
+            .padding(horizontal = 14.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Text(
             text = label,
             fontSize = 13.sp,
             color = FitBoardColors.textPrimary,
-            modifier = Modifier.width(48.dp)
+            modifier = Modifier.width(48.dp),
+            fontWeight = FontWeight.Medium
         )
         Text(
             text = weightText,

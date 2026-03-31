@@ -57,6 +57,17 @@ internal actual object FitBoardFileStorePlatform {
         }
     }
 
+    actual fun loadDailyRecordOrNull(dateKey: String): StoredDailyRecord? {
+        val file = resolveFile(recordPath(dateKey))
+        if (!file.exists()) {
+            return null
+        }
+
+        return runCatching {
+            parseDailyRecord(JSONObject(file.readText()), dateKey)
+        }.getOrNull()
+    }
+
     actual fun saveDailyRecord(record: StoredDailyRecord): Boolean {
         val file = resolveFile(recordPath(record.date))
         ensureParentDirectory(file)

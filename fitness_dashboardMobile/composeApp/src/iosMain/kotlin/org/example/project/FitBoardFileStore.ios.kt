@@ -45,6 +45,17 @@ internal actual object FitBoardFileStorePlatform {
         }
     }
 
+    actual fun loadDailyRecordOrNull(dateKey: String): StoredDailyRecord? {
+        val path = resolvePath(recordPath(dateKey))
+        if (!NSFileManager.defaultManager.fileExistsAtPath(path)) {
+            return null
+        }
+
+        return readJsonObject(path)?.let {
+            parseDailyRecord(it, dateKey)
+        }
+    }
+
     actual fun saveDailyRecord(record: StoredDailyRecord): Boolean {
         return writeJsonObject(resolvePath(recordPath(record.date)), record.toJsonObject())
     }

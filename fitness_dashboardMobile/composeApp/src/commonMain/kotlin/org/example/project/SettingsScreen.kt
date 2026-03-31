@@ -54,8 +54,7 @@ fun SettingsScreen(
         )
 
         SettingsPage.Training -> SettingsSubpageScaffold(
-            title = "训练类型设置",
-            subtitle = "管理记录页可选的训练类型",
+            title = "训练类型",
             onBack = { currentPage = SettingsPage.Home }
         ) {
             TrainingSettingsSection(
@@ -79,8 +78,7 @@ fun SettingsScreen(
         }
 
         SettingsPage.Supplement -> SettingsSubpageScaffold(
-            title = "补剂类型设置",
-            subtitle = "管理记录页可选的补剂类型",
+            title = "补剂类型",
             onBack = { currentPage = SettingsPage.Home }
         ) {
             SupplementSettingsSection(
@@ -104,8 +102,7 @@ fun SettingsScreen(
         }
 
         SettingsPage.SleepGoal -> SettingsSubpageScaffold(
-            title = "睡眠目标设置",
-            subtitle = "使用预设时长作为评分目标",
+            title = "睡眠目标",
             onBack = { currentPage = SettingsPage.Home }
         ) {
             SleepGoalSettingsCard(
@@ -117,8 +114,7 @@ fun SettingsScreen(
         }
 
         SettingsPage.StepGoal -> SettingsSubpageScaffold(
-            title = "步数目标设置",
-            subtitle = "使用预设步数作为评分目标",
+            title = "步数目标",
             onBack = { currentPage = SettingsPage.Home }
         ) {
             StepGoalSettingsCard(
@@ -128,8 +124,7 @@ fun SettingsScreen(
         }
 
         SettingsPage.Style -> SettingsSubpageScaffold(
-            title = "风格设置",
-            subtitle = "切换整套主题模式",
+            title = "风格",
             onBack = { currentPage = SettingsPage.Home }
         ) {
             StyleSettingsSection(
@@ -139,16 +134,14 @@ fun SettingsScreen(
         }
 
         SettingsPage.LocalData -> SettingsSubpageScaffold(
-            title = "本地数据导入与导出",
-            subtitle = "当前仅提供入口和占位说明",
+            title = "本地数据",
             onBack = { currentPage = SettingsPage.Home }
         ) {
             LocalDataSection()
         }
 
         SettingsPage.About -> SettingsSubpageScaffold(
-            title = "关于应用",
-            subtitle = "应用信息与当前定位",
+            title = "关于",
             onBack = { currentPage = SettingsPage.Home }
         ) {
             AboutSection()
@@ -184,65 +177,55 @@ private fun SettingsHomeScreen(
         Column(Modifier.padding(horizontal = 4.dp)) {
             Text(
                 text = "设置",
-                fontSize = 26.sp,
+                fontSize = 30.sp,
                 fontWeight = FontWeight.SemiBold,
                 color = FitBoardColors.textPrimary
-            )
-            Spacer(Modifier.height(3.dp))
-            Text(
-                text = "目标、类型、风格与本地说明",
-                fontSize = 14.sp,
-                color = FitBoardColors.textSecondary
             )
         }
 
         Spacer(Modifier.height(20.dp))
 
         SettingsEntryCard(
-            title = "训练类型设置",
-            description = "管理记录页的训练选项",
+            title = "训练类型",
             onClick = { onNavigate(SettingsPage.Training) }
         )
         Spacer(Modifier.height(12.dp))
 
         SettingsEntryCard(
-            title = "补剂类型设置",
-            description = "管理记录页的补剂选项",
+            title = "补剂类型",
             onClick = { onNavigate(SettingsPage.Supplement) }
         )
         Spacer(Modifier.height(12.dp))
 
         SettingsEntryCard(
-            title = "睡眠目标设置",
-            description = formatSleepGoal(state.sleepGoalHours, state.sleepGoalMinutes),
+            title = "睡眠目标",
+            value = formatSleepGoal(state.sleepGoalHours, state.sleepGoalMinutes),
             onClick = { onNavigate(SettingsPage.SleepGoal) }
         )
         Spacer(Modifier.height(12.dp))
 
         SettingsEntryCard(
-            title = "步数目标设置",
-            description = "${state.stepGoal}步",
+            title = "步数目标",
+            value = "${state.stepGoal}步",
             onClick = { onNavigate(SettingsPage.StepGoal) }
         )
         Spacer(Modifier.height(12.dp))
 
         SettingsEntryCard(
-            title = "风格设置",
-            description = state.themeMode.title,
+            title = "风格",
+            value = state.themeMode.title,
             onClick = { onNavigate(SettingsPage.Style) }
         )
         Spacer(Modifier.height(12.dp))
 
         SettingsEntryCard(
-            title = "本地数据导入与导出",
-            description = "入口已预留，功能暂未开放",
+            title = "本地数据",
             onClick = { onNavigate(SettingsPage.LocalData) }
         )
         Spacer(Modifier.height(12.dp))
 
         SettingsEntryCard(
-            title = "关于应用",
-            description = "查看应用信息与当前定位",
+            title = "关于",
             onClick = { onNavigate(SettingsPage.About) }
         )
 
@@ -253,7 +236,7 @@ private fun SettingsHomeScreen(
 @Composable
 private fun SettingsSubpageScaffold(
     title: String,
-    subtitle: String,
+    subtitle: String? = null,
     onBack: () -> Unit,
     content: @Composable () -> Unit
 ) {
@@ -271,16 +254,18 @@ private fun SettingsSubpageScaffold(
             Spacer(Modifier.height(14.dp))
             Text(
                 text = title,
-                fontSize = 26.sp,
+                fontSize = 30.sp,
                 fontWeight = FontWeight.SemiBold,
                 color = FitBoardColors.textPrimary
             )
-            Spacer(Modifier.height(3.dp))
-            Text(
-                text = subtitle,
-                fontSize = 14.sp,
-                color = FitBoardColors.textSecondary
-            )
+            if (!subtitle.isNullOrBlank()) {
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    text = subtitle,
+                    fontSize = 14.sp,
+                    color = FitBoardColors.textSecondary
+                )
+            }
         }
 
         Spacer(Modifier.height(20.dp))
@@ -302,20 +287,12 @@ private fun SettingsSubpageBackButton(onBack: () -> Unit) {
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Box(
-            modifier = Modifier
-                .clip(RoundedCornerShape(10.dp))
-                .background(FitBoardColors.badgeActiveBg)
-                .padding(horizontal = 8.dp, vertical = 4.dp),
-            contentAlignment = Alignment.Center
-        ) {
-            Text(
-                text = "‹",
-                fontSize = 14.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = FitBoardColors.badgeActiveText
-            )
-        }
+        Text(
+            text = "‹",
+            fontSize = 16.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = FitBoardColors.textPrimary
+        )
         Text(
             text = "返回",
             fontSize = 14.sp,
@@ -333,15 +310,7 @@ internal fun TrainingSettingsSection(
 ) {
     var draft by remember { mutableStateOf("") }
 
-    SettingsCard(label = "训练", title = "训练类型设置") {
-        Text(
-            text = "管理记录页可选的训练类型。第一版继续使用本地编辑，不做独立配置流程。",
-            fontSize = 13.sp,
-            color = FitBoardColors.textSecondary,
-            lineHeight = 20.sp
-        )
-        Spacer(Modifier.height(12.dp))
-
+    SettingsCard(label = "训练", title = "训练类型") {
         AddInputRow(
             value = draft,
             placeholder = "新增训练类型",
@@ -356,13 +325,12 @@ internal fun TrainingSettingsSection(
         Spacer(Modifier.height(10.dp))
 
         if (options.isEmpty()) {
-            EmptyHint("当前没有训练类型配置，可先新增一个训练类型。")
+            EmptyHint("暂无训练项")
         } else {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 options.forEach { name ->
                     SettingsItemRow(
                         name = name,
-                        description = "用于记录页的训练单选列表",
                         canDelete = options.size > 1,
                         onDelete = { onDelete(name) }
                     )
@@ -380,15 +348,7 @@ internal fun SupplementSettingsSection(
 ) {
     var draft by remember { mutableStateOf("") }
 
-    SettingsCard(label = "补剂", title = "补剂类型设置") {
-        Text(
-            text = "管理记录页可选的补剂类型。第一版先保留本地编辑与列表占位。",
-            fontSize = 13.sp,
-            color = FitBoardColors.textSecondary,
-            lineHeight = 20.sp
-        )
-        Spacer(Modifier.height(12.dp))
-
+    SettingsCard(label = "补剂", title = "补剂类型") {
         AddInputRow(
             value = draft,
             placeholder = "新增补剂名称",
@@ -403,13 +363,12 @@ internal fun SupplementSettingsSection(
         Spacer(Modifier.height(10.dp))
 
         if (options.isEmpty()) {
-            EmptyHint("当前没有补剂配置，可先新增一个补剂。")
+            EmptyHint("暂无补剂项")
         } else {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 options.forEach { name ->
                     SettingsItemRow(
                         name = name,
-                        description = "用于记录页的补剂多选列表",
                         canDelete = options.size > 1,
                         onDelete = { onDelete(name) }
                     )
@@ -421,25 +380,17 @@ internal fun SupplementSettingsSection(
 
 @Composable
 private fun LocalDataSection() {
-    SettingsCard(label = "说明", title = "本地数据与导入导出") {
-        Text(
-            text = "当前设置与每日记录已落到本地文件。导入与导出入口先保留占位，后续再继续补齐。",
-            fontSize = 13.sp,
-            color = FitBoardColors.textSecondary,
-            lineHeight = 20.sp
-        )
-        Spacer(Modifier.height(12.dp))
-
+    SettingsCard(label = "本地", title = "导入 / 导出") {
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             PlaceholderActionButton(
-                label = "导出占位",
+                label = "导出",
                 modifier = Modifier.weight(1f)
             )
             PlaceholderActionButton(
-                label = "导入占位",
+                label = "导入",
                 modifier = Modifier.weight(1f)
             )
         }
@@ -448,14 +399,10 @@ private fun LocalDataSection() {
 
 @Composable
 private fun AboutSection() {
-    SettingsCard(label = "关于", title = "关于应用") {
-        AboutRow(key = "应用名称", value = "FitBoard")
+    SettingsCard(label = "关于", title = "应用") {
+        AboutRow(key = "名称", value = "FitBoard")
         Spacer(Modifier.height(8.dp))
-        AboutRow(key = "当前定位", value = "轻量健康记录助手")
-        Spacer(Modifier.height(8.dp))
-        AboutRow(key = "界面职责", value = "首页概览 / 健康评分 / 记录录入 / 设置配置")
-        Spacer(Modifier.height(8.dp))
-        AboutRow(key = "技术实现", value = "Compose Multiplatform")
+        AboutRow(key = "技术", value = "Compose Multiplatform")
     }
 }
 
@@ -464,24 +411,11 @@ private fun StyleSettingsSection(
     themeMode: AppThemeMode,
     onThemeChange: (AppThemeMode) -> Unit
 ) {
-    SettingsCard(label = "主题", title = "App 主题风格") {
-        Text(
-            text = "默认模式已调整为更白、更轻的系统级健康摘要风格，其他主题继续作为备选。",
-            fontSize = 13.sp,
-            color = FitBoardColors.textSecondary,
-            lineHeight = 20.sp
-        )
-        Spacer(Modifier.height(12.dp))
-
+    SettingsCard(label = "主题", title = "主题") {
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
             AppThemeMode.entries.forEach { option ->
                 StyleOptionCard(
-                    title = if (option == AppThemeMode.SoftGreen) {
-                        "默认模式（当前默认）"
-                    } else {
-                        option.title
-                    },
-                    description = option.subtitle,
+                    title = option.title,
                     selected = option == themeMode,
                     swatches = previewSwatchesForTheme(option),
                     onClick = { onThemeChange(option) }
@@ -498,15 +432,7 @@ private fun SleepGoalSettingsCard(
     onSelectHour: (Int) -> Unit,
     onSelectMinute: (Int) -> Unit
 ) {
-    SettingsCard(label = "睡眠目标", title = "目标时长") {
-        Text(
-            text = "使用预设滚动选择设置睡眠目标。",
-            fontSize = 13.sp,
-            color = FitBoardColors.textSecondary,
-            lineHeight = 20.sp
-        )
-        Spacer(Modifier.height(12.dp))
-
+    SettingsCard(label = "睡眠", title = "目标时长") {
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             GoalPickerColumn(
                 title = "小时",
@@ -525,9 +451,6 @@ private fun SleepGoalSettingsCard(
                 modifier = Modifier.weight(1f)
             )
         }
-
-        Spacer(Modifier.height(12.dp))
-        EmptyHint("当前目标：${formatSleepGoal(selectedHour, selectedMinute)}")
     }
 }
 
@@ -536,15 +459,7 @@ private fun StepGoalSettingsCard(
     selectedStepGoal: Int,
     onSelectStepGoal: (Int) -> Unit
 ) {
-    SettingsCard(label = "步数目标", title = "目标步数") {
-        Text(
-            text = "使用预设滚动选择设置步数目标。",
-            fontSize = 13.sp,
-            color = FitBoardColors.textSecondary,
-            lineHeight = 20.sp
-        )
-        Spacer(Modifier.height(12.dp))
-
+    SettingsCard(label = "步数", title = "目标步数") {
         GoalPickerColumn(
             title = "步数",
             selectedValue = selectedStepGoal,
@@ -553,9 +468,6 @@ private fun StepGoalSettingsCard(
             onSelect = onSelectStepGoal,
             modifier = Modifier.fillMaxWidth()
         )
-
-        Spacer(Modifier.height(12.dp))
-        EmptyHint("当前目标：${selectedStepGoal}步")
     }
 }
 
@@ -616,17 +528,17 @@ private fun <T> GoalPickerColumn(
 @Composable
 private fun SettingsEntryCard(
     title: String,
-    description: String,
+    value: String? = null,
     onClick: () -> Unit
 ) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(18.dp))
-            .border(1.dp, FitBoardColors.cardBorder, RoundedCornerShape(18.dp))
+            .clip(RoundedCornerShape(20.dp))
+            .border(1.dp, FitBoardColors.cardBorder, RoundedCornerShape(20.dp))
             .background(FitBoardColors.cardBg)
             .clickable { onClick() }
-            .padding(horizontal = 16.dp, vertical = 16.dp)
+            .padding(horizontal = 16.dp, vertical = 17.dp)
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -643,27 +555,28 @@ private fun SettingsEntryCard(
                     fontWeight = FontWeight.Medium,
                     color = FitBoardColors.textPrimary
                 )
-                Text(
-                    text = description,
-                    fontSize = 12.sp,
-                    color = FitBoardColors.textHint,
-                    lineHeight = 18.sp
-                )
+                if (!value.isNullOrBlank()) {
+                    Text(
+                        text = value,
+                        fontSize = 12.sp,
+                        color = FitBoardColors.textHint,
+                        lineHeight = 18.sp
+                    )
+                }
             }
             Spacer(Modifier.width(10.dp))
             Text(
-                text = "›",
-                fontSize = 18.sp,
-                color = FitBoardColors.textHint
-            )
-        }
+            text = "›",
+            fontSize = 16.sp,
+            color = FitBoardColors.textHint
+        )
+    }
     }
 }
 
 @Composable
 private fun StyleOptionCard(
     title: String,
-    description: String,
     selected: Boolean,
     swatches: List<Color>,
     onClick: () -> Unit
@@ -671,11 +584,11 @@ private fun StyleOptionCard(
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(16.dp))
+            .clip(RoundedCornerShape(18.dp))
             .border(
                 1.dp,
                 if (selected) FitBoardColors.activeCardBorder else FitBoardColors.inactiveCardBorder,
-                RoundedCornerShape(16.dp)
+                RoundedCornerShape(18.dp)
             )
             .background(if (selected) FitBoardColors.activeCardBg else FitBoardColors.inactiveCardBg)
             .clickable { onClick() }
@@ -686,21 +599,12 @@ private fun StyleOptionCard(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Column(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(4.dp)
-            ) {
+            Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = title,
                     fontSize = 14.sp,
                     fontWeight = FontWeight.Medium,
                     color = FitBoardColors.textPrimary
-                )
-                Text(
-                    text = description,
-                    fontSize = 12.sp,
-                    lineHeight = 18.sp,
-                    color = FitBoardColors.textHint
                 )
             }
             Spacer(Modifier.width(12.dp))
@@ -741,19 +645,19 @@ private fun StyleOptionCard(
 private fun previewSwatchesForTheme(themeMode: AppThemeMode): List<Color> =
     when (themeMode) {
         AppThemeMode.SoftGreen -> listOf(
-            Color(0xFFFCFCFD),
             Color(0xFFFFFFFF),
-            Color(0xFFF3F3F5)
+            Color(0xFFF2F6FF),
+            Color(0xFF2E6EDC)
         )
         AppThemeMode.White -> listOf(
-            Color(0xFFFAFAF7),
-            Color(0xFFFFFFFF),
-            Color(0xFFF0F4F0)
+            Color(0xFFFEFFFF),
+            Color(0xFFF1F6FF),
+            Color(0xFF2A65C8)
         )
         AppThemeMode.Dark -> listOf(
             Color(0xFF080808),
             Color(0xFF161616),
-            Color(0xFF242321)
+            Color(0xFF4D7BD9)
         )
     }
 
@@ -829,17 +733,16 @@ private fun AddInputRow(
 @Composable
 private fun SettingsItemRow(
     name: String,
-    description: String,
     canDelete: Boolean,
     onDelete: () -> Unit
 ) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(14.dp))
-            .border(1.dp, FitBoardColors.inactiveCardBorder, RoundedCornerShape(14.dp))
+            .clip(RoundedCornerShape(18.dp))
+            .border(1.dp, FitBoardColors.inactiveCardBorder, RoundedCornerShape(18.dp))
             .background(FitBoardColors.inactiveCardBg)
-            .padding(horizontal = 14.dp, vertical = 12.dp),
+            .padding(horizontal = 14.dp, vertical = 13.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -849,11 +752,6 @@ private fun SettingsItemRow(
                 fontSize = 14.sp,
                 fontWeight = FontWeight.Medium,
                 color = FitBoardColors.textPrimary
-            )
-            Text(
-                text = description,
-                fontSize = 11.sp,
-                color = FitBoardColors.textHint
             )
         }
         Spacer(Modifier.width(8.dp))
@@ -877,8 +775,8 @@ private fun SettingsItemRow(
 private fun PlaceholderActionButton(label: String, modifier: Modifier = Modifier) {
     Box(
         modifier = modifier
-            .clip(RoundedCornerShape(14.dp))
-            .border(1.dp, FitBoardColors.cardBorder, RoundedCornerShape(14.dp))
+            .clip(RoundedCornerShape(18.dp))
+            .border(1.dp, FitBoardColors.cardBorder, RoundedCornerShape(18.dp))
             .background(FitBoardColors.cardBg)
             .padding(vertical = 12.dp),
         contentAlignment = Alignment.Center
@@ -907,8 +805,8 @@ private fun EmptyHint(text: String) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
-            .border(1.dp, FitBoardColors.innerPanelBorder, RoundedCornerShape(12.dp))
+            .clip(RoundedCornerShape(18.dp))
+            .border(1.dp, FitBoardColors.innerPanelBorder, RoundedCornerShape(18.dp))
             .background(FitBoardColors.innerPanelBg)
             .padding(horizontal = 14.dp, vertical = 14.dp)
     ) {

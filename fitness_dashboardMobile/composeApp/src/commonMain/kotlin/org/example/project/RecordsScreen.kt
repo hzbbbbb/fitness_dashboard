@@ -6,7 +6,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.defaultMinSize
@@ -23,8 +22,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
@@ -34,7 +31,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
@@ -49,8 +45,10 @@ import androidx.compose.ui.unit.sp
 fun RecordsScreen(
     state: AppUiState,
     today: String,
-    onStateChange: (AppUiState) -> Unit,
-    onSaveTodayRecord: () -> Unit
+    onWeightChange: (String) -> Unit,
+    onTrainingChange: (String?) -> Unit,
+    onSupplementsChange: (Set<String>) -> Unit,
+    onNoteChange: (String) -> Unit
 ) {
     val focusManager = LocalFocusManager.current
     val dismissKeyboardOnScroll = remember(focusManager) {
@@ -86,30 +84,21 @@ fun RecordsScreen(
             Column(Modifier.padding(horizontal = 4.dp)) {
                 Text(
                     text = "今日记录",
-                    fontSize = 26.sp,
+                    fontSize = 30.sp,
                     fontWeight = FontWeight.SemiBold,
                     color = FitBoardColors.textPrimary
                 )
-                Spacer(Modifier.height(3.dp))
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(
-                        text = "当天录入与保存",
-                        fontSize = 14.sp,
-                        color = FitBoardColors.textSecondary
-                    )
-                    Text(
-                        text = today,
-                        fontSize = 13.sp,
-                        color = FitBoardColors.textHint
-                    )
+                    Spacer(Modifier.weight(1f))
+                    ScoreTag(text = today)
                 }
             }
 
-            Spacer(Modifier.height(16.dp))
+            Spacer(Modifier.height(18.dp))
 
             RecordCompletenessBanner(state = state)
             Spacer(Modifier.height(12.dp))
@@ -117,13 +106,7 @@ fun RecordsScreen(
             WeightRecordCard(
                 weightInput = state.weightInput,
                 savedWeight = state.savedWeight,
-                onWeightChange = { onStateChange(state.copy(weightInput = it, isSaved = false)) },
-                onSave = {
-                    val trimmed = state.weightInput.trim()
-                    if (trimmed.isNotEmpty()) {
-                        onStateChange(state.copy(savedWeight = trimmed, isSaved = false))
-                    }
-                }
+                onWeightChange = onWeightChange
             )
             Spacer(Modifier.height(12.dp))
 
@@ -132,7 +115,7 @@ fun RecordsScreen(
                 options = state.trainingOptions,
                 onSelect = { option ->
                     val updated = if (state.selectedTraining == option) null else option
-                    onStateChange(state.copy(selectedTraining = updated, isSaved = false))
+                    onTrainingChange(updated)
                 }
             )
             Spacer(Modifier.height(12.dp))
@@ -146,23 +129,14 @@ fun RecordsScreen(
                     } else {
                         state.checkedSupplements + option
                     }
-                    onStateChange(state.copy(checkedSupplements = updated, isSaved = false))
+                    onSupplementsChange(updated)
                 }
             )
             Spacer(Modifier.height(12.dp))
 
             NotesRecordCard(
                 note = state.note,
-                onNoteChange = { onStateChange(state.copy(note = it, isSaved = false)) }
-            )
-            Spacer(Modifier.height(20.dp))
-
-            SaveTodayRecordButton(
-                isSaved = state.isSaved,
-                onClick = {
-                    focusManager.clearFocus(force = true)
-                    onSaveTodayRecord()
-                }
+                onNoteChange = onNoteChange
             )
             Spacer(Modifier.height(28.dp))
         }
@@ -188,10 +162,10 @@ private fun RecordCompletenessBanner(state: AppUiState) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(16.dp))
-            .border(1.dp, borderColor, RoundedCornerShape(16.dp))
+            .clip(RoundedCornerShape(18.dp))
+            .border(1.dp, borderColor, RoundedCornerShape(18.dp))
             .background(bgColor)
-            .padding(horizontal = 16.dp, vertical = 14.dp)
+            .padding(horizontal = 16.dp, vertical = 15.dp)
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -229,60 +203,46 @@ private fun RecordCompletenessBanner(state: AppUiState) {
 internal fun WeightRecordCard(
     weightInput: String,
     savedWeight: String?,
-    onWeightChange: (String) -> Unit,
-    onSave: () -> Unit
+    onWeightChange: (String) -> Unit
 ) {
     FitCard {
-        CardLabel("体重")
-        Spacer(Modifier.height(2.dp))
-        CardTitle("体重录入")
-        Spacer(Modifier.height(12.dp))
-
         Row(
             modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.Top
         ) {
-            OutlinedTextField(
-                value = weightInput,
-                onValueChange = onWeightChange,
-                modifier = Modifier.weight(1f),
-                placeholder = {
-                    Text("输入今日体重 (kg)", color = FitBoardColors.textHint, fontSize = 14.sp)
-                },
-                singleLine = true,
-                shape = RoundedCornerShape(14.dp),
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = FitBoardColors.activeCardBorder,
-                    unfocusedBorderColor = FitBoardColors.inactiveCardBorder,
-                    focusedContainerColor = FitBoardColors.cardBg,
-                    unfocusedContainerColor = FitBoardColors.inactiveCardBg,
-                    cursorColor = FitBoardColors.textPrimary,
-                    focusedTextColor = FitBoardColors.textPrimary,
-                    unfocusedTextColor = FitBoardColors.textPrimary,
-                )
-            )
-            Button(
-                onClick = onSave,
-                shape = RoundedCornerShape(14.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = FitBoardColors.buttonGreen,
-                    contentColor = Color.White,
-                ),
-                contentPadding = PaddingValues(horizontal = 20.dp, vertical = 14.dp)
-            ) {
-                Text("保存", fontSize = 14.sp, fontWeight = FontWeight.Medium)
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                CardLabel("体重")
+                CardTitle("体重录入")
             }
         }
 
-        Spacer(Modifier.height(10.dp))
+        Spacer(Modifier.height(14.dp))
 
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(6.dp)
-        ) {
-            Text("当前体重：", fontSize = 13.sp, color = FitBoardColors.textSecondary)
+        OutlinedTextField(
+            value = weightInput,
+            onValueChange = onWeightChange,
+            modifier = Modifier.fillMaxWidth(),
+            placeholder = {
+                Text("输入今日体重 (kg)", color = FitBoardColors.textHint, fontSize = 14.sp)
+            },
+            singleLine = true,
+            shape = RoundedCornerShape(14.dp),
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedBorderColor = FitBoardColors.activeCardBorder,
+                unfocusedBorderColor = FitBoardColors.inactiveCardBorder,
+                focusedContainerColor = FitBoardColors.cardBg,
+                unfocusedContainerColor = FitBoardColors.inactiveCardBg,
+                cursorColor = FitBoardColors.textPrimary,
+                focusedTextColor = FitBoardColors.textPrimary,
+                unfocusedTextColor = FitBoardColors.textPrimary,
+            )
+        )
+
+        if (savedWeight != null) {
+            Spacer(Modifier.height(10.dp))
+
             Box(
                 modifier = Modifier
                     .clip(RoundedCornerShape(20.dp))
@@ -290,14 +250,10 @@ internal fun WeightRecordCard(
                     .padding(horizontal = 10.dp, vertical = 3.dp)
             ) {
                 Text(
-                    text = savedWeight?.let { "$it kg" } ?: "未保存",
+                    text = "$savedWeight kg",
                     fontSize = 13.sp,
                     fontWeight = FontWeight.Medium,
-                    color = if (savedWeight != null) {
-                        FitBoardColors.badgeActiveText
-                    } else {
-                        FitBoardColors.textHint
-                    }
+                    color = FitBoardColors.badgeActiveText
                 )
             }
         }
@@ -312,15 +268,15 @@ internal fun TrainingRecordCard(
 ) {
     FitCard {
         CardLabel("训练")
-        Spacer(Modifier.height(2.dp))
+        Spacer(Modifier.height(4.dp))
         CardTitle("今日训练")
-        Spacer(Modifier.height(12.dp))
+        Spacer(Modifier.height(14.dp))
 
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(16.dp))
-                .border(1.dp, FitBoardColors.innerPanelBorder, RoundedCornerShape(16.dp))
+                .clip(RoundedCornerShape(18.dp))
+                .border(1.dp, FitBoardColors.innerPanelBorder, RoundedCornerShape(18.dp))
                 .background(FitBoardColors.innerPanelBg)
                 .padding(8.dp),
             verticalArrangement = Arrangement.spacedBy(6.dp)
@@ -352,7 +308,7 @@ internal fun SupplementRecordCard(
         ) {
             Column {
                 CardLabel("补剂")
-                Spacer(Modifier.height(2.dp))
+                Spacer(Modifier.height(4.dp))
                 CardTitle("今日补剂")
             }
             Box(
@@ -374,8 +330,8 @@ internal fun SupplementRecordCard(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(16.dp))
-                .border(1.dp, FitBoardColors.innerPanelBorder, RoundedCornerShape(16.dp))
+                .clip(RoundedCornerShape(18.dp))
+                .border(1.dp, FitBoardColors.innerPanelBorder, RoundedCornerShape(18.dp))
                 .background(FitBoardColors.innerPanelBg)
                 .padding(8.dp),
             verticalArrangement = Arrangement.spacedBy(6.dp)
@@ -404,15 +360,15 @@ private fun SelectableRecordItem(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
+            .clip(RoundedCornerShape(16.dp))
             .border(
                 1.dp,
                 if (isActive) FitBoardColors.activeCardBorder else FitBoardColors.inactiveCardBorder,
-                RoundedCornerShape(12.dp)
+                RoundedCornerShape(16.dp)
             )
             .background(if (isActive) FitBoardColors.activeCardBg else FitBoardColors.inactiveCardBg)
             .clickable { onClick() }
-            .padding(horizontal = 14.dp, vertical = 11.dp),
+            .padding(horizontal = 14.dp, vertical = 12.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -469,7 +425,7 @@ internal fun NotesRecordCard(note: String, onNoteChange: (String) -> Unit) {
         ) {
             Column {
                 CardLabel("备注")
-                Spacer(Modifier.height(2.dp))
+                Spacer(Modifier.height(4.dp))
                 CardTitle("今日备注")
             }
             Text(
@@ -488,7 +444,7 @@ internal fun NotesRecordCard(note: String, onNoteChange: (String) -> Unit) {
                 .defaultMinSize(minHeight = 108.dp),
             placeholder = {
                 Text(
-                    "记录今日状态、训练感受或补充说明...",
+                    "备注",
                     color = FitBoardColors.textHint,
                     fontSize = 13.sp
                 )
@@ -504,28 +460,6 @@ internal fun NotesRecordCard(note: String, onNoteChange: (String) -> Unit) {
                 unfocusedTextColor = FitBoardColors.textPrimary,
             ),
             maxLines = 5,
-        )
-    }
-}
-
-@Composable
-private fun SaveTodayRecordButton(isSaved: Boolean, onClick: () -> Unit) {
-    Button(
-        onClick = onClick,
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(52.dp),
-        shape = RoundedCornerShape(16.dp),
-        colors = ButtonDefaults.buttonColors(
-            containerColor = if (isSaved) FitBoardColors.buttonSavedBg else FitBoardColors.buttonGreen,
-            contentColor = if (isSaved) FitBoardColors.buttonSavedText else Color.White,
-        ),
-        elevation = ButtonDefaults.buttonElevation(defaultElevation = 0.dp)
-    ) {
-        Text(
-            text = if (isSaved) "✓  已保存今日记录" else "保存今日记录",
-            fontSize = 15.sp,
-            fontWeight = FontWeight.Medium
         )
     }
 }

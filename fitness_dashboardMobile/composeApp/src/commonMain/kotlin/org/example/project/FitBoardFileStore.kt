@@ -45,6 +45,7 @@ internal expect object FitBoardFileStorePlatform {
     fun loadOrCreateConfig(defaultConfig: StoredAppConfig): StoredAppConfig
     fun saveConfig(config: StoredAppConfig): Boolean
     fun loadOrCreateDailyRecord(defaultRecord: StoredDailyRecord): StoredDailyRecord
+    fun loadDailyRecordOrNull(dateKey: String): StoredDailyRecord?
     fun saveDailyRecord(record: StoredDailyRecord): Boolean
 }
 
@@ -79,6 +80,19 @@ internal object FitBoardFileStore {
                 healthSummary = healthSummary
             )
         )
+    }
+
+    fun loadHistoricalDailyRecords(dateKeys: List<String>): Map<String, StoredDailyRecord> {
+        return buildMap {
+            dateKeys.distinct().forEach { dateKey ->
+                val record = FitBoardFileStorePlatform
+                    .loadDailyRecordOrNull(dateKey)
+                    ?.sanitizeForHistory(todayKey = dateKey)
+                    ?: return@forEach
+
+                put(dateKey, record)
+            }
+        }
     }
 }
 
@@ -121,6 +135,21 @@ private fun StoredDailyRecord.sanitize(
     )
 }
 
+private fun StoredDailyRecord.sanitizeForHistory(todayKey: String): StoredDailyRecord {
+    return copy(
+        schemaVersion = FIT_BOARD_SCHEMA_VERSION,
+        date = todayKey,
+        weight = weight?.trim()?.takeIf { it.isNotEmpty() },
+        selectedTraining = selectedTraining?.trim()?.takeIf { it.isNotEmpty() },
+        selectedSupplements = selectedSupplements
+            .map { it.trim() }
+            .filter { it.isNotEmpty() }
+            .distinct(),
+        note = note.take(140),
+        healthSummary = healthSummary.sanitize()
+    )
+}
+
 private fun StoredHealthSummary.sanitize(): StoredHealthSummary {
     return copy(
         authorizationState = parseAuthorizationState(authorizationState).name
@@ -142,13 +171,16 @@ private fun AppUiState.toStoredDailyRecord(
     todayKey: String,
     healthSummary: HealthSummaryUiState
 ): StoredDailyRecord {
+    val normalizedWeight = savedWeight?.trim()?.takeIf { it.isNotEmpty() }
+        ?: weightInput.trim().takeIf { it.isNotEmpty() }
+
     return StoredDailyRecord(
         date = todayKey,
-        weight = savedWeight?.trim()?.takeIf { it.isNotEmpty() },
+        weight = normalizedWeight,
         selectedTraining = selectedTraining,
         selectedSupplements = checkedSupplements.toList().sorted(),
         note = note.trim(),
-        isSaved = isSaved,
+        isSaved = true,
         healthSummary = healthSummary.toStoredSummary()
     )
 }
@@ -186,7 +218,7 @@ private fun HealthSummaryUiState.toStoredSummary(): StoredHealthSummary {
     )
 }
 
-private fun StoredHealthSummary.toUiState(): HealthSummaryUiState {
+internal fun StoredHealthSummary.toUiState(): HealthSummaryUiState {
     return HealthSummaryUiState(
         authorizationState = parseAuthorizationState(authorizationState),
         statusMessage = statusMessage,

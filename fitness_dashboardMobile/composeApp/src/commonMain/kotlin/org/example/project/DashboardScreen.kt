@@ -5,6 +5,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -17,6 +18,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
@@ -30,9 +32,42 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlin.math.roundToInt
+
+private const val HEATMAP_WEEKS = 11
+
+private data class HeatmapModel(
+    val weeks: List<HeatmapWeekColumn>
+)
+
+private data class HeatmapWeekColumn(
+    val days: List<HeatmapDayCell>
+)
+
+private data class HeatmapDayCell(
+    val date: CalendarDay,
+    val score: Int?,
+    val level: HeatmapScoreLevel,
+    val isToday: Boolean,
+    val isFuture: Boolean
+)
+
+private data class HeatmapLayoutMetrics(
+    val cellSize: Dp,
+    val cellGap: Dp
+)
+
+private enum class HeatmapScoreLevel {
+    Empty,
+    Level1,
+    Level2,
+    Level3,
+    Level4,
+    Level5
+}
 
 @Composable
 fun HomeScreen(
@@ -78,6 +113,39 @@ private fun HomeSummaryPage(
 ) {
     val healthState = currentHealthSummaryState()
     val scoreState = buildHealthScoreState(state = state, healthState = healthState)
+    val visibleCards = state.homeCardsInDisplayOrder()
+    val todayDate = remember(dateInfo) { dateInfo.toCalendarDay() }
+    val historicalKeys = remember(todayDate) {
+        buildHeatmapWeekDates(todayDate)
+            .flatten()
+            .map(CalendarDay::toStorageKey)
+            .filter { it != todayDate.toStorageKey() }
+    }
+    val historicalRecords = remember(historicalKeys) {
+        FitBoardFileStore.loadHistoricalDailyRecords(historicalKeys)
+    }
+    val heatmapModel = remember(
+        todayDate,
+        historicalRecords,
+        state.sleepGoalHours,
+        state.sleepGoalMinutes,
+        state.stepGoal,
+        state.supplementOptions,
+        state.selectedTraining,
+        state.checkedSupplements,
+        healthState.authorizationState,
+        healthState.todaySteps,
+        healthState.hasTodaySteps,
+        healthState.sleepDurationHours,
+        healthState.hasSleepDuration
+    ) {
+        buildHeatmapModel(
+            today = todayDate,
+            currentState = state,
+            currentHealthState = healthState,
+            historicalRecords = historicalRecords
+        )
+    }
 
     Column(
         modifier = Modifier
@@ -89,25 +157,21 @@ private fun HomeSummaryPage(
         Spacer(Modifier.height(12.dp))
 
         HeatmapCard(
-            dateInfo = dateInfo,
-            hasRecordToday = state.hasAnyRecord(),
-            today = today
+            heatmapModel = heatmapModel
         )
 
-        Spacer(Modifier.height(16.dp))
+        Spacer(Modifier.height(20.dp))
 
         HomeSectionHeader(
             title = "摘要",
-            subtitle = "参考系统健康摘要方式，可直接在这里编辑卡片",
             trailingAction = "编辑",
             onTrailingClick = onEditClick
         )
 
-        Spacer(Modifier.height(10.dp))
+        Spacer(Modifier.height(12.dp))
 
-        val visibleCards = state.homeCardsInDisplayOrder()
         if (visibleCards.isEmpty()) {
-            HomeCardsEmptyState()
+            HomeCardsEmptyState(onEditClick = onEditClick)
         } else {
             visibleCards.forEachIndexed { index, card ->
                 HomeSummaryCardBlock(
@@ -129,7 +193,7 @@ private fun HomeSummaryPage(
 @Composable
 private fun HomeSectionHeader(
     title: String,
-    subtitle: String,
+    subtitle: String? = null,
     trailingAction: String? = null,
     onTrailingClick: (() -> Unit)? = null
 ) {
@@ -138,168 +202,107 @@ private fun HomeSectionHeader(
             .fillMaxWidth()
             .padding(horizontal = 4.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
+        verticalAlignment = Alignment.Bottom
     ) {
         Column(
             modifier = Modifier.weight(1f),
-            verticalArrangement = Arrangement.spacedBy(3.dp)
+            verticalArrangement = Arrangement.spacedBy(4.dp)
         ) {
             Text(
                 text = title,
-                fontSize = 24.sp,
+                fontSize = 30.sp,
                 fontWeight = FontWeight.SemiBold,
                 color = FitBoardColors.textPrimary
             )
-            Text(
-                text = subtitle,
-                fontSize = 14.sp,
-                color = FitBoardColors.textSecondary
+            if (!subtitle.isNullOrBlank()) {
+                Text(
+                    text = subtitle,
+                    fontSize = 14.sp,
+                    lineHeight = 20.sp,
+                    color = FitBoardColors.textSecondary
+                )
+            }
+        }
+
+        if (!trailingAction.isNullOrBlank() && onTrailingClick != null) {
+            Spacer(Modifier.width(14.dp))
+            QuietActionButton(
+                label = trailingAction,
+                onClick = onTrailingClick
             )
         }
-        if (!trailingAction.isNullOrBlank() && onTrailingClick != null) {
-            Spacer(Modifier.width(12.dp))
-            Box(
+    }
+}
+
+@Composable
+private fun HeatmapCard(
+    heatmapModel: HeatmapModel
+) {
+    BoxWithConstraints(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(24.dp))
+            .border(1.dp, FitBoardColors.cardBorder, RoundedCornerShape(24.dp))
+            .background(FitBoardColors.cardBg)
+    ) {
+        val metrics = rememberHeatmapLayoutMetrics(maxWidth = maxWidth)
+
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 14.dp, vertical = 12.dp)
+        ) {
+            Text(
+                text = "FitBoard",
+                fontSize = 28.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = FitBoardColors.textPrimary
+            )
+
+            Spacer(Modifier.height(8.dp))
+
+            Column(
                 modifier = Modifier
-                    .clip(RoundedCornerShape(18.dp))
-                    .border(1.dp, FitBoardColors.countBadgeBorder, RoundedCornerShape(18.dp))
-                    .background(FitBoardColors.cardBg)
-                    .clickable { onTrailingClick() }
-                    .padding(horizontal = 12.dp, vertical = 7.dp),
-                contentAlignment = Alignment.Center
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(20.dp))
+                    .background(FitBoardColors.bgGradientEnd)
+                    .padding(horizontal = 4.dp, vertical = 8.dp)
             ) {
-                Text(
-                    text = trailingAction,
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.Medium,
-                    color = FitBoardColors.textPrimary
-                )
+                Box(
+                    modifier = Modifier.fillMaxWidth(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.Top
+                    ) {
+                        heatmapModel.weeks.forEach { week ->
+                            HeatmapWeekGrid(
+                                week = week,
+                                metrics = metrics
+                            )
+                        }
+                    }
+                }
             }
         }
     }
 }
 
 @Composable
-internal fun HeatmapCard(
-    dateInfo: DateInfo,
-    hasRecordToday: Boolean,
-    today: String
+private fun HeatmapWeekGrid(
+    week: HeatmapWeekColumn,
+    metrics: HeatmapLayoutMetrics
 ) {
-    val monthLabels = listOf(
-        "1月", "2月", "3月", "4月", "5月", "6月",
-        "7月", "8月", "9月", "10月", "11月", "12月"
-    )
-    val weekLabels = listOf("一", "二", "三", "四", "五", "六", "日")
-    val todayCol = dateInfo.dayOfWeek - 1
-    val todayIndex = 4 * 7 + todayCol
-
-    FitCard {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.Top
-        ) {
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text(
-                    text = "FitBoard",
-                    fontSize = 25.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = FitBoardColors.textPrimary
-                )
-                Text(
-                    text = "最近一个月记录热力图",
-                    fontSize = 14.sp,
-                    color = FitBoardColors.textSecondary
-                )
-            }
-
-            Column(
-                horizontalAlignment = Alignment.End,
-                verticalArrangement = Arrangement.spacedBy(6.dp)
-            ) {
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(18.dp))
-                        .border(1.dp, FitBoardColors.countBadgeBorder, RoundedCornerShape(18.dp))
-                        .background(FitBoardColors.countBadgeBg)
-                        .padding(horizontal = 10.dp, vertical = 5.dp)
-                ) {
-                    Text(
-                        text = "${dateInfo.year}年${monthLabels[dateInfo.month - 1]}",
-                        fontSize = 12.sp,
-                        color = FitBoardColors.countBadgeText
-                    )
-                }
-                Text(
-                    text = today,
-                    fontSize = 12.sp,
-                    color = FitBoardColors.textHint
-                )
-            }
-        }
-
-        Spacer(Modifier.height(16.dp))
-
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(16.dp))
-                .border(1.dp, FitBoardColors.innerPanelBorder, RoundedCornerShape(16.dp))
-                .background(FitBoardColors.innerPanelBg)
-                .padding(horizontal = 12.dp, vertical = 12.dp)
-        ) {
-            Column {
-                Row(modifier = Modifier.fillMaxWidth()) {
-                    weekLabels.forEach { label ->
-                        Box(
-                            modifier = Modifier.weight(1f),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = label,
-                                fontSize = 10.sp,
-                                color = FitBoardColors.textHint
-                            )
-                        }
-                    }
-                }
-
-                Spacer(Modifier.height(8.dp))
-
-                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    for (row in 0..4) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(6.dp)
-                        ) {
-                            for (col in 0..6) {
-                                val cellIndex = row * 7 + col
-                                val dayOffset = cellIndex - todayIndex
-                                HeatmapCell(
-                                    modifier = Modifier.weight(1f),
-                                    dayOffset = dayOffset,
-                                    hasRecord = dayOffset == 0 && hasRecordToday,
-                                    isToday = dayOffset == 0
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        Spacer(Modifier.height(12.dp))
-
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            HeatmapLegendPill(
-                color = FitBoardColors.heatCellTodayRecord,
-                text = "已记录"
-            )
-            HeatmapLegendPill(
-                color = FitBoardColors.heatCellEmpty,
-                text = "无记录"
+    Column(
+        verticalArrangement = Arrangement.spacedBy(metrics.cellGap),
+        modifier = Modifier.width(metrics.cellSize)
+    ) {
+        week.days.forEach { cell ->
+            HeatmapCell(
+                cell = cell,
+                metrics = metrics
             )
         }
     }
@@ -307,71 +310,162 @@ internal fun HeatmapCard(
 
 @Composable
 private fun HeatmapCell(
-    modifier: Modifier,
-    dayOffset: Int,
-    hasRecord: Boolean,
-    isToday: Boolean
+    cell: HeatmapDayCell,
+    metrics: HeatmapLayoutMetrics
 ) {
-    if (dayOffset > 0 || dayOffset < -29) {
-        Spacer(modifier = modifier.aspectRatio(1f))
+    if (cell.isFuture) {
+        Spacer(
+            modifier = Modifier
+                .size(metrics.cellSize)
+                .aspectRatio(1f)
+        )
         return
     }
 
-    val fillColor = when {
-        isToday && hasRecord -> FitBoardColors.heatCellTodayRecord
-        isToday -> FitBoardColors.heatCellToday
-        hasRecord -> FitBoardColors.heatCellRecord
-        else -> FitBoardColors.heatCellEmpty
-    }
-    val borderColor = when {
-        isToday && hasRecord -> FitBoardColors.heatTodayBorder
-        isToday -> FitBoardColors.heatTodayBorder
-        hasRecord -> FitBoardColors.heatTodayBorder.copy(alpha = 0.72f)
-        else -> FitBoardColors.cardBorder
-    }
+    val fillColor = heatmapColorForLevel(cell.level)
+    val outerShape = RoundedCornerShape(5.dp)
+    val innerShape = RoundedCornerShape(4.dp)
 
     Box(
-        modifier = modifier
-            .aspectRatio(1f)
-            .clip(RoundedCornerShape(8.dp))
-            .border(1.dp, borderColor, RoundedCornerShape(8.dp))
-            .background(FitBoardColors.cardBg)
-            .padding(2.dp)
-    ) {
+        modifier = Modifier
+            .size(metrics.cellSize)
+            .clip(outerShape)
+            .background(if (cell.isToday) FitBoardColors.activeCardBg else Color.Transparent)
+            .padding(if (cell.isToday) 1.dp else 0.dp)
+    )
+    {
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .clip(RoundedCornerShape(6.dp))
+                .clip(innerShape)
                 .background(fillColor)
         )
     }
 }
 
 @Composable
-private fun HeatmapLegendPill(
-    color: Color,
-    text: String
-) {
-    Row(
-        modifier = Modifier
-            .clip(RoundedCornerShape(18.dp))
-            .border(1.dp, FitBoardColors.innerPanelBorder, RoundedCornerShape(18.dp))
-            .background(FitBoardColors.innerPanelBg)
-            .padding(horizontal = 10.dp, vertical = 6.dp),
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Box(
-            modifier = Modifier
-                .size(8.dp)
-                .clip(RoundedCornerShape(4.dp))
-                .background(color)
+private fun rememberHeatmapLayoutMetrics(maxWidth: Dp): HeatmapLayoutMetrics {
+    val gridWidth = maxWidth - 36.dp
+    val rawCellSize = gridWidth / HEATMAP_WEEKS
+    val cellSize = rawCellSize.coerceIn(18.dp, 20.dp)
+    val cellGap = 3.dp
+
+    return HeatmapLayoutMetrics(
+        cellSize = cellSize,
+        cellGap = cellGap
+    )
+}
+
+private fun buildHeatmapModel(
+    today: CalendarDay,
+    currentState: AppUiState,
+    currentHealthState: HealthSummaryUiState,
+    historicalRecords: Map<String, StoredDailyRecord>
+): HeatmapModel {
+    val todayKey = today.toStorageKey()
+    val weekDates = buildHeatmapWeekDates(today)
+    val weekColumns = weekDates.mapIndexed { index, days ->
+        HeatmapWeekColumn(
+            days = days.map { date ->
+                val dateKey = date.toStorageKey()
+                val isToday = dateKey == todayKey
+                val isFuture = date > today
+                val score = when {
+                    isFuture -> null
+                    isToday -> buildHeatmapScore(
+                        state = currentState,
+                        healthState = currentHealthState
+                    )
+                    else -> historicalRecords[dateKey]?.let { record ->
+                        buildHeatmapScore(
+                            state = record.toHistoricalAppUiState(referenceState = currentState),
+                            healthState = record.healthSummary.toUiState()
+                        )
+                    }
+                }
+
+                HeatmapDayCell(
+                    date = date,
+                    score = score,
+                    level = heatmapLevelForScore(score),
+                    isToday = isToday,
+                    isFuture = isFuture
+                )
+            }
         )
-        Text(
-            text = text,
-            fontSize = 10.sp,
-            color = FitBoardColors.textHint
-        )
+    }
+
+    return HeatmapModel(weeks = weekColumns)
+}
+
+private fun buildHeatmapWeekDates(today: CalendarDay): List<List<CalendarDay>> {
+    val currentWeekStart = today.startOfWeekMonday()
+    val firstWeekStart = currentWeekStart.minusDays((HEATMAP_WEEKS - 1) * 7)
+
+    return List(HEATMAP_WEEKS) { weekIndex ->
+        List(7) { dayIndex ->
+            firstWeekStart.plusDays(weekIndex * 7 + dayIndex)
+        }
+    }
+}
+
+private fun buildHeatmapScore(
+    state: AppUiState,
+    healthState: HealthSummaryUiState
+): Int? {
+    if (!hasHeatmapScoreData(state, healthState)) {
+        return null
+    }
+
+    return buildHealthScoreState(
+        state = state,
+        healthState = healthState
+    ).totalScore.roundToInt().coerceIn(0, 100)
+}
+
+private fun hasHeatmapScoreData(
+    state: AppUiState,
+    healthState: HealthSummaryUiState
+): Boolean {
+    return healthState.hasTodaySteps ||
+        healthState.hasSleepDuration ||
+        state.selectedTraining != null ||
+        state.checkedSupplements.isNotEmpty()
+}
+
+private fun StoredDailyRecord.toHistoricalAppUiState(
+    referenceState: AppUiState
+): AppUiState {
+    return referenceState.copy(
+        weightInput = weight.orEmpty(),
+        savedWeight = weight,
+        selectedTraining = selectedTraining,
+        checkedSupplements = selectedSupplements.toSet(),
+        note = note,
+        isSaved = true
+    )
+}
+
+private fun heatmapLevelForScore(score: Int?): HeatmapScoreLevel {
+    return when {
+        score == null -> HeatmapScoreLevel.Empty
+        score <= 20 -> HeatmapScoreLevel.Level1
+        score <= 40 -> HeatmapScoreLevel.Level2
+        score <= 60 -> HeatmapScoreLevel.Level3
+        score <= 80 -> HeatmapScoreLevel.Level4
+        else -> HeatmapScoreLevel.Level5
+    }
+}
+
+@Composable
+private fun heatmapColorForLevel(level: HeatmapScoreLevel): Color {
+    return when (level) {
+        HeatmapScoreLevel.Empty -> FitBoardColors.heatCellEmpty
+        HeatmapScoreLevel.Level1 -> FitBoardColors.heatCellLevel1
+        HeatmapScoreLevel.Level2 -> FitBoardColors.heatCellLevel2
+        HeatmapScoreLevel.Level3 -> FitBoardColors.heatCellLevel3
+        HeatmapScoreLevel.Level4 -> FitBoardColors.heatCellLevel4
+        HeatmapScoreLevel.Level5 -> FitBoardColors.heatCellLevel5
     }
 }
 
@@ -388,11 +482,7 @@ private fun HomeSummaryCardBlock(
             title = "今日步数",
             value = if (healthState.hasTodaySteps) "${healthState.todaySteps}" else "暂无",
             unit = if (healthState.hasTodaySteps) "步" else "",
-            summary = when {
-                healthState.hasTodaySteps -> "目标 ${state.stepGoal} 步"
-                else -> healthState.statusMessage
-            },
-            footnote = healthState.lastUpdatedAt.takeIf { it.isNotBlank() }?.let { "更新于 $it" }
+            summary = if (healthState.hasTodaySteps) null else healthState.statusMessage
         )
 
         HomeSummaryCard.Sleep -> HomeMetricCard(
@@ -401,11 +491,10 @@ private fun HomeSummaryCardBlock(
             value = if (healthState.hasSleepDuration) formatSleepDuration(healthState.sleepDurationHours) else "暂无",
             unit = "",
             summary = if (healthState.hasSleepDuration) {
-                "目标 ${formatSleepGoalSummary(state.sleepGoalHours, state.sleepGoalMinutes)}"
+                null
             } else {
                 healthState.statusMessage
-            },
-            footnote = healthState.lastUpdatedAt.takeIf { it.isNotBlank() }?.let { "更新于 $it" }
+            }
         )
 
         HomeSummaryCard.Score -> HomeScoreCard(scoreState = scoreState)
@@ -419,7 +508,7 @@ private fun HomeSummaryCardBlock(
                 "${state.checkedSupplements.size}/${state.supplementOptions.size}"
             },
             secondary = when {
-                state.checkedSupplements.isEmpty() -> "还没有保存补剂记录"
+                state.checkedSupplements.isEmpty() -> null
                 else -> state.checkedSupplements.joinToString("、")
             }
         )
@@ -428,11 +517,7 @@ private fun HomeSummaryCardBlock(
             label = "训练",
             title = "训练情况",
             primary = state.selectedTraining ?: "今日未记录",
-            secondary = if (state.selectedTraining == null) {
-                "还没有保存训练记录"
-            } else {
-                "训练已纳入今日摘要与健康分"
-            }
+            secondary = null
         )
     }
 }
@@ -443,14 +528,13 @@ private fun HomeMetricCard(
     title: String,
     value: String,
     unit: String,
-    summary: String,
-    footnote: String?
+    summary: String?
 ) {
     FitCard {
         CardLabel(label)
-        Spacer(Modifier.height(2.dp))
+        Spacer(Modifier.height(4.dp))
         CardTitle(title)
-        Spacer(Modifier.height(14.dp))
+        Spacer(Modifier.height(18.dp))
 
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -460,7 +544,7 @@ private fun HomeMetricCard(
             Row(verticalAlignment = Alignment.Bottom) {
                 Text(
                     text = value,
-                    fontSize = 34.sp,
+                    fontSize = 36.sp,
                     fontWeight = FontWeight.SemiBold,
                     color = FitBoardColors.textPrimary
                 )
@@ -476,22 +560,9 @@ private fun HomeMetricCard(
             }
         }
 
-        Spacer(Modifier.height(10.dp))
-
-        Text(
-            text = summary,
-            fontSize = 13.sp,
-            lineHeight = 19.sp,
-            color = FitBoardColors.textSecondary
-        )
-
-        if (!footnote.isNullOrBlank()) {
-            Spacer(Modifier.height(8.dp))
-            Text(
-                text = footnote,
-                fontSize = 11.sp,
-                color = FitBoardColors.textHint
-            )
+        if (!summary.isNullOrBlank()) {
+            Spacer(Modifier.height(14.dp))
+            HomeInfoPanel(text = summary)
         }
     }
 }
@@ -500,32 +571,31 @@ private fun HomeMetricCard(
 private fun HomeScoreCard(scoreState: HealthScorePageState) {
     FitCard {
         CardLabel("评分")
-        Spacer(Modifier.height(2.dp))
+        Spacer(Modifier.height(4.dp))
         CardTitle("今日健康分")
-        Spacer(Modifier.height(14.dp))
+        Spacer(Modifier.height(18.dp))
 
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.Top
         ) {
-            Text(
-                text = formatScore(scoreState.totalScore),
-                fontSize = 38.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = FitBoardColors.textPrimary
-            )
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text(
+                    text = formatScore(scoreState.totalScore),
+                    fontSize = 38.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = FitBoardColors.textPrimary
+                )
+                Text(
+                    text = "/ 100",
+                    fontSize = 14.sp,
+                    color = FitBoardColors.textSecondary
+                )
+            }
             ScoreTag(text = scoreState.levelLabel)
         }
 
-        Spacer(Modifier.height(10.dp))
-
-        Text(
-            text = "睡眠、步数、训练和补剂共同构成当天评分。",
-            fontSize = 13.sp,
-            lineHeight = 19.sp,
-            color = FitBoardColors.textSecondary
-        )
     }
 }
 
@@ -534,13 +604,13 @@ private fun HomeStatusCard(
     label: String,
     title: String,
     primary: String,
-    secondary: String
+    secondary: String?
 ) {
     FitCard {
         CardLabel(label)
-        Spacer(Modifier.height(2.dp))
+        Spacer(Modifier.height(4.dp))
         CardTitle(title)
-        Spacer(Modifier.height(14.dp))
+        Spacer(Modifier.height(18.dp))
 
         Text(
             text = primary,
@@ -548,28 +618,45 @@ private fun HomeStatusCard(
             fontWeight = FontWeight.SemiBold,
             color = FitBoardColors.textPrimary
         )
-        Spacer(Modifier.height(10.dp))
-        Text(
-            text = secondary,
-            fontSize = 13.sp,
-            lineHeight = 19.sp,
-            color = FitBoardColors.textSecondary
-        )
+
+        if (!secondary.isNullOrBlank()) {
+            Spacer(Modifier.height(14.dp))
+            HomeInfoPanel(text = secondary)
+        }
     }
 }
 
 @Composable
-private fun HomeCardsEmptyState() {
+private fun HomeInfoPanel(
+    text: String
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(18.dp))
+            .border(1.dp, FitBoardColors.innerPanelBorder, RoundedCornerShape(18.dp))
+            .background(FitBoardColors.innerPanelBg)
+            .padding(horizontal = 14.dp, vertical = 14.dp)
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text(
+                text = text,
+                fontSize = 13.sp,
+                lineHeight = 20.sp,
+                color = FitBoardColors.textSecondary
+            )
+        }
+    }
+}
+
+@Composable
+private fun HomeCardsEmptyState(onEditClick: () -> Unit) {
     FitCard {
-        CardLabel("摘要")
-        Spacer(Modifier.height(2.dp))
-        CardTitle("首页当前没有显示卡片")
-        Spacer(Modifier.height(10.dp))
-        Text(
-            text = "你可以前往设置里的“首页内容设置”，选择要显示的摘要卡片。",
-            fontSize = 13.sp,
-            lineHeight = 19.sp,
-            color = FitBoardColors.textSecondary
+        CardTitle("暂无摘要")
+        Spacer(Modifier.height(14.dp))
+        QuietActionButton(
+            label = "编辑",
+            onClick = onEditClick
         )
     }
 }
@@ -596,27 +683,33 @@ private fun HomeSummaryEditorPage(
         HomeEditorTopBar(onBack = onBack)
         Spacer(Modifier.height(16.dp))
 
-        HomeSectionHeader(
-            title = "编辑摘要",
-            subtitle = "热力图会始终固定在首页顶部"
-        )
+        Column(
+            modifier = Modifier.padding(horizontal = 4.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            Text(
+                text = "编辑摘要",
+                fontSize = 30.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = FitBoardColors.textPrimary
+            )
+        }
 
         Spacer(Modifier.height(12.dp))
 
-        FitCard {
-            CardLabel("已显示")
-            Spacer(Modifier.height(2.dp))
-            CardTitle("当前摘要卡片")
-            Spacer(Modifier.height(12.dp))
-
+        EditorSectionCard(
+            label = "已显示",
+            title = "当前摘要卡片",
+            countText = "${visibleCards.size} 项"
+        ) {
             if (visibleCards.isEmpty()) {
-                EmptyEditorState(text = "当前没有显示中的摘要卡片。")
+                EmptyEditorState(text = "暂无卡片")
             } else {
                 visibleCards.forEachIndexed { index, card ->
                     EditorCardRow(
                         title = card.title,
-                        description = card.description,
                         actionLabel = "移除",
+                        actionSymbol = "-",
                         onAction = { onRemoveCard(card) }
                     )
                     if (index != visibleCards.lastIndex) {
@@ -628,20 +721,19 @@ private fun HomeSummaryEditorPage(
 
         Spacer(Modifier.height(12.dp))
 
-        FitCard {
-            CardLabel("可添加")
-            Spacer(Modifier.height(2.dp))
-            CardTitle("更多摘要卡片")
-            Spacer(Modifier.height(12.dp))
-
+        EditorSectionCard(
+            label = "可添加",
+            title = "候选摘要卡片",
+            countText = "${hiddenCards.size} 项"
+        ) {
             if (hiddenCards.isEmpty()) {
-                EmptyEditorState(text = "当前 5 个候选项都已经显示。")
+                EmptyEditorState(text = "已全部添加")
             } else {
                 hiddenCards.forEachIndexed { index, card ->
                     EditorCardRow(
                         title = card.title,
-                        description = card.description,
                         actionLabel = "添加",
+                        actionSymbol = "+",
                         onAction = { onAddCard(card) }
                     )
                     if (index != hiddenCards.lastIndex) {
@@ -657,74 +749,113 @@ private fun HomeSummaryEditorPage(
 
 @Composable
 private fun HomeEditorTopBar(onBack: () -> Unit) {
-    Box(
-        modifier = Modifier
-            .clip(RoundedCornerShape(18.dp))
-            .border(1.dp, FitBoardColors.countBadgeBorder, RoundedCornerShape(18.dp))
-            .background(FitBoardColors.cardBg)
-            .clickable { onBack() }
-            .padding(horizontal = 14.dp, vertical = 10.dp)
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.End
     ) {
-        Text(
-            text = "返回摘要",
-            fontSize = 14.sp,
-            fontWeight = FontWeight.Medium,
-            color = FitBoardColors.textPrimary
+        QuietActionButton(
+            label = "完成",
+            onClick = onBack
         )
+    }
+}
+
+@Composable
+private fun EditorSectionCard(
+    label: String,
+    title: String,
+    countText: String,
+    content: @Composable () -> Unit
+) {
+    FitCard {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.Top
+        ) {
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                CardLabel(label)
+                CardTitle(title)
+            }
+            QuietPill(countText)
+        }
+
+        Spacer(Modifier.height(14.dp))
+        content()
     }
 }
 
 @Composable
 private fun EditorCardRow(
     title: String,
-    description: String,
     actionLabel: String,
+    actionSymbol: String,
     onAction: () -> Unit
 ) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(14.dp))
-            .border(1.dp, FitBoardColors.innerPanelBorder, RoundedCornerShape(14.dp))
+            .clip(RoundedCornerShape(18.dp))
+            .border(1.dp, FitBoardColors.innerPanelBorder, RoundedCornerShape(18.dp))
             .background(FitBoardColors.innerPanelBg)
-            .padding(horizontal = 14.dp, vertical = 13.dp),
+            .padding(horizontal = 14.dp, vertical = 14.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Column(
-            modifier = Modifier.weight(1f),
-            verticalArrangement = Arrangement.spacedBy(4.dp)
-        ) {
+        Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = title,
-                fontSize = 14.sp,
+                fontSize = 15.sp,
                 fontWeight = FontWeight.Medium,
                 color = FitBoardColors.textPrimary
             )
-            Text(
-                text = description,
-                fontSize = 12.sp,
-                lineHeight = 18.sp,
-                color = FitBoardColors.textHint
-            )
         }
+
         Spacer(Modifier.width(12.dp))
+
+        EditorActionButton(
+            label = actionLabel,
+            symbol = actionSymbol,
+            onClick = onAction
+        )
+    }
+}
+
+@Composable
+private fun EditorActionButton(
+    label: String,
+    symbol: String,
+    onClick: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .clip(RoundedCornerShape(18.dp))
+            .clickable { onClick() }
+            .padding(start = 2.dp, end = 2.dp, top = 2.dp, bottom = 2.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
         Box(
             modifier = Modifier
-                .clip(RoundedCornerShape(14.dp))
-                .border(1.dp, FitBoardColors.countBadgeBorder, RoundedCornerShape(14.dp))
-                .background(FitBoardColors.cardBg)
-                .clickable { onAction() }
-                .padding(horizontal = 12.dp, vertical = 7.dp),
+                .size(24.dp)
+                .clip(CircleShape)
+                .border(1.dp, FitBoardColors.activeCardBorder, CircleShape)
+                .background(FitBoardColors.activeCardBg),
             contentAlignment = Alignment.Center
         ) {
             Text(
-                text = actionLabel,
-                fontSize = 13.sp,
+                text = symbol,
+                fontSize = 14.sp,
                 fontWeight = FontWeight.Medium,
-                color = FitBoardColors.textPrimary
+                color = FitBoardColors.activeText
             )
         }
+        Text(
+            text = label,
+            fontSize = 13.sp,
+            fontWeight = FontWeight.Medium,
+            color = FitBoardColors.activeText
+        )
     }
 }
 
@@ -733,8 +864,8 @@ private fun EmptyEditorState(text: String) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(14.dp))
-            .border(1.dp, FitBoardColors.innerPanelBorder, RoundedCornerShape(14.dp))
+            .clip(RoundedCornerShape(18.dp))
+            .border(1.dp, FitBoardColors.innerPanelBorder, RoundedCornerShape(18.dp))
             .background(FitBoardColors.innerPanelBg)
             .padding(horizontal = 14.dp, vertical = 14.dp)
     ) {
@@ -747,10 +878,42 @@ private fun EmptyEditorState(text: String) {
     }
 }
 
-private fun formatSleepGoalSummary(hour: Int, minute: Int): String {
-    return if (minute == 0) {
-        "${hour}小时"
-    } else {
-        "${hour}小时${minute}分"
+@Composable
+private fun QuietPill(text: String) {
+    Box(
+        modifier = Modifier
+            .clip(RoundedCornerShape(16.dp))
+            .border(1.dp, FitBoardColors.countBadgeBorder, RoundedCornerShape(16.dp))
+            .background(FitBoardColors.countBadgeBg)
+            .padding(horizontal = 10.dp, vertical = 5.dp)
+    ) {
+        Text(
+            text = text,
+            fontSize = 12.sp,
+            color = FitBoardColors.countBadgeText
+        )
+    }
+}
+
+@Composable
+private fun QuietActionButton(
+    label: String,
+    onClick: () -> Unit
+) {
+    Box(
+        modifier = Modifier
+            .clip(RoundedCornerShape(18.dp))
+            .border(1.dp, FitBoardColors.activeCardBorder, RoundedCornerShape(18.dp))
+            .background(FitBoardColors.activeCardBg)
+            .clickable { onClick() }
+            .padding(horizontal = 14.dp, vertical = 8.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = label,
+            fontSize = 13.sp,
+            fontWeight = FontWeight.Medium,
+            color = FitBoardColors.activeText
+        )
     }
 }
