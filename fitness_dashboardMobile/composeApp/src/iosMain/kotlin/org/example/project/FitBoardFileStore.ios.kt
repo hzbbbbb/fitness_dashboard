@@ -142,6 +142,15 @@ private fun parseDailyRecord(json: Map<*, *>, fallbackDate: String): StoredDaily
             hasTodaySteps = healthJson?.boolValue("hasTodaySteps", false) ?: false,
             sleepDurationHours = healthJson?.doubleValue("sleepDurationHours", 0.0) ?: 0.0,
             hasSleepDuration = healthJson?.boolValue("hasSleepDuration", false) ?: false,
+            workoutType = healthJson?.stringValue("workoutType", "") ?: "",
+            workoutDurationMinutes = healthJson?.doubleValue("workoutDurationMinutes", 0.0) ?: 0.0,
+            hasWorkout = healthJson?.boolValue("hasWorkout", false) ?: false,
+            workoutStartDateIso = healthJson?.stringValue("workoutStartDateIso", "") ?: "",
+            workoutEndDateIso = healthJson?.stringValue("workoutEndDateIso", "") ?: "",
+            workoutCaloriesKilocalories = healthJson?.doubleValue("workoutCaloriesKilocalories", 0.0) ?: 0.0,
+            hasWorkoutCalories = healthJson?.boolValue("hasWorkoutCalories", false) ?: false,
+            workoutDistanceKilometers = healthJson?.doubleValue("workoutDistanceKilometers", 0.0) ?: 0.0,
+            hasWorkoutDistance = healthJson?.boolValue("hasWorkoutDistance", false) ?: false,
             lastUpdatedAt = healthJson?.stringValue("lastUpdatedAt", "") ?: ""
         )
     )
@@ -175,6 +184,15 @@ private fun StoredDailyRecord.toJsonObject(): Map<String, Any?> {
             "hasTodaySteps" to healthSummary.hasTodaySteps,
             "sleepDurationHours" to healthSummary.sleepDurationHours,
             "hasSleepDuration" to healthSummary.hasSleepDuration,
+            "workoutType" to healthSummary.workoutType,
+            "workoutDurationMinutes" to healthSummary.workoutDurationMinutes,
+            "hasWorkout" to healthSummary.hasWorkout,
+            "workoutStartDateIso" to healthSummary.workoutStartDateIso,
+            "workoutEndDateIso" to healthSummary.workoutEndDateIso,
+            "workoutCaloriesKilocalories" to healthSummary.workoutCaloriesKilocalories,
+            "hasWorkoutCalories" to healthSummary.hasWorkoutCalories,
+            "workoutDistanceKilometers" to healthSummary.workoutDistanceKilometers,
+            "hasWorkoutDistance" to healthSummary.hasWorkoutDistance,
             "lastUpdatedAt" to healthSummary.lastUpdatedAt
         )
     )

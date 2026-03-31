@@ -117,6 +117,15 @@ internal actual object FitBoardFileStorePlatform {
                 hasTodaySteps = healthJson?.optBoolean("hasTodaySteps", false) ?: false,
                 sleepDurationHours = healthJson?.optDouble("sleepDurationHours", 0.0) ?: 0.0,
                 hasSleepDuration = healthJson?.optBoolean("hasSleepDuration", false) ?: false,
+                workoutType = healthJson?.optString("workoutType", "") ?: "",
+                workoutDurationMinutes = healthJson?.optDouble("workoutDurationMinutes", 0.0) ?: 0.0,
+                hasWorkout = healthJson?.optBoolean("hasWorkout", false) ?: false,
+                workoutStartDateIso = healthJson?.optString("workoutStartDateIso", "") ?: "",
+                workoutEndDateIso = healthJson?.optString("workoutEndDateIso", "") ?: "",
+                workoutCaloriesKilocalories = healthJson?.optDouble("workoutCaloriesKilocalories", 0.0) ?: 0.0,
+                hasWorkoutCalories = healthJson?.optBoolean("hasWorkoutCalories", false) ?: false,
+                workoutDistanceKilometers = healthJson?.optDouble("workoutDistanceKilometers", 0.0) ?: 0.0,
+                hasWorkoutDistance = healthJson?.optBoolean("hasWorkoutDistance", false) ?: false,
                 lastUpdatedAt = healthJson?.optString("lastUpdatedAt", "") ?: ""
             )
         )
@@ -153,6 +162,15 @@ private fun StoredDailyRecord.toJson(): JSONObject {
                 put("hasTodaySteps", healthSummary.hasTodaySteps)
                 put("sleepDurationHours", healthSummary.sleepDurationHours)
                 put("hasSleepDuration", healthSummary.hasSleepDuration)
+                put("workoutType", healthSummary.workoutType)
+                put("workoutDurationMinutes", healthSummary.workoutDurationMinutes)
+                put("hasWorkout", healthSummary.hasWorkout)
+                put("workoutStartDateIso", healthSummary.workoutStartDateIso)
+                put("workoutEndDateIso", healthSummary.workoutEndDateIso)
+                put("workoutCaloriesKilocalories", healthSummary.workoutCaloriesKilocalories)
+                put("hasWorkoutCalories", healthSummary.hasWorkoutCalories)
+                put("workoutDistanceKilometers", healthSummary.workoutDistanceKilometers)
+                put("hasWorkoutDistance", healthSummary.hasWorkoutDistance)
                 put("lastUpdatedAt", healthSummary.lastUpdatedAt)
             }
         )

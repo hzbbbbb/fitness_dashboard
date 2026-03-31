@@ -22,6 +22,15 @@ data class HealthSummaryUiState(
     val hasTodaySteps: Boolean = false,
     val sleepDurationHours: Double = 0.0,
     val hasSleepDuration: Boolean = false,
+    val workoutType: String = "",
+    val workoutDurationMinutes: Double = 0.0,
+    val hasWorkout: Boolean = false,
+    val workoutStartDateIso: String = "",
+    val workoutEndDateIso: String = "",
+    val workoutCaloriesKilocalories: Double = 0.0,
+    val hasWorkoutCalories: Boolean = false,
+    val workoutDistanceKilometers: Double = 0.0,
+    val hasWorkoutDistance: Boolean = false,
     val lastUpdatedAt: String = ""
 )
 
@@ -85,6 +94,15 @@ fun updateHealthAuthorized(
     hasTodaySteps: Boolean,
     sleepDurationHours: Double,
     hasSleepDuration: Boolean,
+    workoutType: String,
+    workoutDurationMinutes: Double,
+    hasWorkout: Boolean,
+    workoutStartDateIso: String,
+    workoutEndDateIso: String,
+    workoutCaloriesKilocalories: Double,
+    hasWorkoutCalories: Boolean,
+    workoutDistanceKilometers: Double,
+    hasWorkoutDistance: Boolean,
     lastUpdatedAt: String,
     statusMessage: String = "Apple 健康数据已更新"
 ) {
@@ -96,6 +114,15 @@ fun updateHealthAuthorized(
             hasTodaySteps = hasTodaySteps,
             sleepDurationHours = sleepDurationHours,
             hasSleepDuration = hasSleepDuration,
+            workoutType = workoutType,
+            workoutDurationMinutes = workoutDurationMinutes,
+            hasWorkout = hasWorkout,
+            workoutStartDateIso = workoutStartDateIso,
+            workoutEndDateIso = workoutEndDateIso,
+            workoutCaloriesKilocalories = workoutCaloriesKilocalories,
+            hasWorkoutCalories = hasWorkoutCalories,
+            workoutDistanceKilometers = workoutDistanceKilometers,
+            hasWorkoutDistance = hasWorkoutDistance,
             lastUpdatedAt = lastUpdatedAt
         )
     )

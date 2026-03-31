@@ -8,6 +8,7 @@ final class HealthKitManager: ObservableObject {
     private let healthStore = HKHealthStore()
     private let stepType = HKQuantityType.quantityType(forIdentifier: .stepCount)
     private let sleepType = HKObjectType.categoryType(forIdentifier: .sleepAnalysis)
+    private let workoutType = HKObjectType.workoutType()
     private var hasBootstrapped = false
 
     func bootstrapIfNeeded() {
@@ -41,7 +42,7 @@ final class HealthKitManager: ObservableObject {
 
         HealthBridgeKt.updateHealthLoading(message: "正在请求 Apple 健康读取权限...")
 
-        let readTypes: Set<HKObjectType> = [stepType, sleepType]
+        let readTypes: Set<HKObjectType> = [stepType, sleepType, workoutType]
         healthStore.requestAuthorization(toShare: nil, read: readTypes) { [weak self] success, error in
             DispatchQueue.main.async {
                 guard let self else { return }
@@ -67,7 +68,7 @@ final class HealthKitManager: ObservableObject {
             return
         }
 
-        HealthBridgeKt.updateHealthLoading(message: "正在读取今日步数和睡眠时长...")
+        HealthBridgeKt.updateHealthLoading(message: "正在读取今日步数、睡眠和训练数据...")
 
         let group = DispatchGroup()
 
@@ -75,6 +76,8 @@ final class HealthKitManager: ObservableObject {
         var hasStepData = false
         var sleepHours = 0.0
         var hasSleepData = false
+        var latestWorkout = TodayWorkoutSnapshot.empty
+        var hasWorkoutData = false
         var failureMessage: String?
         var hasAuthorizationDenied = false
 
@@ -114,9 +117,27 @@ final class HealthKitManager: ObservableObject {
             group.leave()
         }
 
+        group.enter()
+        fetchTodayLatestWorkout { result in
+            switch result {
+            case .success(let workout):
+                latestWorkout = workout
+                hasWorkoutData = true
+            case .failure(let error):
+                if self.isAuthorizationDeniedError(error) {
+                    hasAuthorizationDenied = true
+                } else {
+                    failureMessage = error.localizedDescription
+                }
+            case .noData:
+                hasWorkoutData = false
+            }
+            group.leave()
+        }
+
         group.notify(queue: .main) {
-            if hasAuthorizationDenied && !hasStepData && !hasSleepData {
-                HealthBridgeKt.updateHealthDenied(message: "未获得 Apple 健康读取权限，请前往系统设置开启步数和睡眠读取权限。")
+            if hasAuthorizationDenied && !hasStepData && !hasSleepData && !hasWorkoutData {
+                HealthBridgeKt.updateHealthDenied(message: "未获得 Apple 健康读取权限，请前往系统设置开启步数、睡眠和训练读取权限。")
                 return
             }
 
@@ -130,8 +151,8 @@ final class HealthKitManager: ObservableObject {
             formatter.dateFormat = "HH:mm"
 
             let message: String
-            if !hasStepData && !hasSleepData {
-                message = "Apple 健康暂无今日步数或睡眠数据，请检查系统授权与健康 App 中的数据记录。"
+            if !hasStepData && !hasSleepData && !hasWorkoutData {
+                message = "Apple 健康暂无今日步数、睡眠或训练数据，请检查系统授权与健康 App 中的数据记录。"
             } else {
                 message = "Apple 健康数据已更新"
             }
@@ -141,6 +162,15 @@ final class HealthKitManager: ObservableObject {
                 hasTodaySteps: hasStepData,
                 sleepDurationHours: sleepHours,
                 hasSleepDuration: hasSleepData,
+                workoutType: latestWorkout.typeLabel,
+                workoutDurationMinutes: latestWorkout.durationMinutes,
+                hasWorkout: hasWorkoutData,
+                workoutStartDateIso: latestWorkout.startDateIso,
+                workoutEndDateIso: latestWorkout.endDateIso,
+                workoutCaloriesKilocalories: latestWorkout.caloriesKilocalories,
+                hasWorkoutCalories: latestWorkout.hasCalories,
+                workoutDistanceKilometers: latestWorkout.distanceKilometers,
+                hasWorkoutDistance: latestWorkout.hasDistance,
                 lastUpdatedAt: formatter.string(from: Date()),
                 statusMessage: message
             )
@@ -231,6 +261,52 @@ final class HealthKitManager: ObservableObject {
         healthStore.execute(query)
     }
 
+    private func fetchTodayLatestWorkout(
+        completion: @escaping (HealthFetchResult<TodayWorkoutSnapshot>) -> Void
+    ) {
+        let now = Date()
+        let startOfDay = Calendar.current.startOfDay(for: now)
+        let predicate = HKQuery.predicateForSamples(withStart: startOfDay, end: now, options: .strictStartDate)
+        let sortDescriptors = [NSSortDescriptor(key: HKSampleSortIdentifierEndDate, ascending: false)]
+
+        let query = HKSampleQuery(
+            sampleType: workoutType,
+            predicate: predicate,
+            limit: 1,
+            sortDescriptors: sortDescriptors
+        ) { _, samples, error in
+            if let error {
+                completion(.failure(error))
+                return
+            }
+
+            guard let workout = (samples as? [HKWorkout])?.first else {
+                completion(.noData)
+                return
+            }
+
+            let calories = workout.totalEnergyBurned?.doubleValue(for: HKUnit.kilocalorie())
+            let distanceInKilometers = workout.totalDistance?.doubleValue(for: HKUnit.meter()) ?? 0.0
+
+            completion(
+                .success(
+                    TodayWorkoutSnapshot(
+                        typeLabel: Self.workoutLabel(for: workout.workoutActivityType),
+                        durationMinutes: workout.duration / 60.0,
+                        startDateIso: Self.iso8601String(from: workout.startDate),
+                        endDateIso: Self.iso8601String(from: workout.endDate),
+                        caloriesKilocalories: calories ?? 0.0,
+                        hasCalories: calories != nil,
+                        distanceKilometers: distanceInKilometers / 1000.0,
+                        hasDistance: workout.totalDistance != nil
+                    )
+                )
+            )
+        }
+
+        healthStore.execute(query)
+    }
+
     private func mergeSleepIntervals(
         from samples: [HKCategorySample],
         boundedBy range: ClosedRange<Date>
@@ -267,6 +343,44 @@ final class HealthKitManager: ObservableObject {
             && nsError.code == HKError.errorAuthorizationDenied.rawValue
     }
 
+    nonisolated private static func workoutLabel(for type: HKWorkoutActivityType) -> String {
+        switch type {
+        case .traditionalStrengthTraining:
+            return "传统力量训练"
+        case .functionalStrengthTraining:
+            return "功能性力量训练"
+        case .running:
+            return "跑步"
+        case .walking:
+            return "步行"
+        case .cycling:
+            return "骑行"
+        case .swimming:
+            return "游泳"
+        case .highIntensityIntervalTraining:
+            return "HIIT"
+        case .mixedCardio:
+            return "混合有氧"
+        case .rowing:
+            return "划船"
+        case .yoga:
+            return "瑜伽"
+        case .hiking:
+            return "徒步"
+        case .elliptical:
+            return "椭圆机"
+        case .other:
+            return "其他训练"
+        default:
+            return "其他训练"
+        }
+    }
+
+    nonisolated private static func iso8601String(from date: Date) -> String {
+        let formatter = ISO8601DateFormatter()
+        return formatter.string(from: date)
+    }
+
     private func isAsleepSample(_ sample: HKCategorySample) -> Bool {
         if #available(iOS 16.0, *) {
             return sample.value == HKCategoryValueSleepAnalysis.asleepUnspecified.rawValue
@@ -283,4 +397,26 @@ private enum HealthFetchResult<Value> {
     case success(Value)
     case noData
     case failure(Error)
+}
+
+private struct TodayWorkoutSnapshot {
+    let typeLabel: String
+    let durationMinutes: Double
+    let startDateIso: String
+    let endDateIso: String
+    let caloriesKilocalories: Double
+    let hasCalories: Bool
+    let distanceKilometers: Double
+    let hasDistance: Bool
+
+    static let empty = TodayWorkoutSnapshot(
+        typeLabel: "",
+        durationMinutes: 0.0,
+        startDateIso: "",
+        endDateIso: "",
+        caloriesKilocalories: 0.0,
+        hasCalories: false,
+        distanceKilometers: 0.0,
+        hasDistance: false
+    )
 }

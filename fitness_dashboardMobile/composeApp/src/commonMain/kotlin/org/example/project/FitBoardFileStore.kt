@@ -22,6 +22,15 @@ internal data class StoredHealthSummary(
     val hasTodaySteps: Boolean = false,
     val sleepDurationHours: Double = 0.0,
     val hasSleepDuration: Boolean = false,
+    val workoutType: String = "",
+    val workoutDurationMinutes: Double = 0.0,
+    val hasWorkout: Boolean = false,
+    val workoutStartDateIso: String = "",
+    val workoutEndDateIso: String = "",
+    val workoutCaloriesKilocalories: Double = 0.0,
+    val hasWorkoutCalories: Boolean = false,
+    val workoutDistanceKilometers: Double = 0.0,
+    val hasWorkoutDistance: Boolean = false,
     val lastUpdatedAt: String = ""
 )
 
@@ -152,7 +161,13 @@ private fun StoredDailyRecord.sanitizeForHistory(todayKey: String): StoredDailyR
 
 private fun StoredHealthSummary.sanitize(): StoredHealthSummary {
     return copy(
-        authorizationState = parseAuthorizationState(authorizationState).name
+        authorizationState = parseAuthorizationState(authorizationState).name,
+        workoutType = workoutType.trim(),
+        workoutDurationMinutes = workoutDurationMinutes.coerceAtLeast(0.0),
+        workoutStartDateIso = workoutStartDateIso.trim(),
+        workoutEndDateIso = workoutEndDateIso.trim(),
+        workoutCaloriesKilocalories = workoutCaloriesKilocalories.coerceAtLeast(0.0),
+        workoutDistanceKilometers = workoutDistanceKilometers.coerceAtLeast(0.0)
     )
 }
 
@@ -214,6 +229,15 @@ private fun HealthSummaryUiState.toStoredSummary(): StoredHealthSummary {
         hasTodaySteps = hasTodaySteps,
         sleepDurationHours = sleepDurationHours,
         hasSleepDuration = hasSleepDuration,
+        workoutType = workoutType,
+        workoutDurationMinutes = workoutDurationMinutes,
+        hasWorkout = hasWorkout,
+        workoutStartDateIso = workoutStartDateIso,
+        workoutEndDateIso = workoutEndDateIso,
+        workoutCaloriesKilocalories = workoutCaloriesKilocalories,
+        hasWorkoutCalories = hasWorkoutCalories,
+        workoutDistanceKilometers = workoutDistanceKilometers,
+        hasWorkoutDistance = hasWorkoutDistance,
         lastUpdatedAt = lastUpdatedAt
     )
 }
@@ -226,6 +250,15 @@ internal fun StoredHealthSummary.toUiState(): HealthSummaryUiState {
         hasTodaySteps = hasTodaySteps,
         sleepDurationHours = sleepDurationHours,
         hasSleepDuration = hasSleepDuration,
+        workoutType = workoutType,
+        workoutDurationMinutes = workoutDurationMinutes,
+        hasWorkout = hasWorkout,
+        workoutStartDateIso = workoutStartDateIso,
+        workoutEndDateIso = workoutEndDateIso,
+        workoutCaloriesKilocalories = workoutCaloriesKilocalories,
+        hasWorkoutCalories = hasWorkoutCalories,
+        workoutDistanceKilometers = workoutDistanceKilometers,
+        hasWorkoutDistance = hasWorkoutDistance,
         lastUpdatedAt = lastUpdatedAt
     )
 }
