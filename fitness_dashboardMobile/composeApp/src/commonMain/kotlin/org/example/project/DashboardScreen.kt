@@ -1,8 +1,14 @@
 package org.example.project
 
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -23,18 +29,29 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.zIndex
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import kotlin.math.abs
 import kotlin.math.roundToInt
 
 private const val HEATMAP_WEEKS = 13
@@ -98,13 +115,22 @@ fun HomeScreen(
         )
 
         HomePage.Editor -> HomeSummaryEditorPage(
-            selectedCards = state.homeVisibleCards,
+            orderedCards = state.orderedHomeCards(),
+            visibleCards = state.homeVisibleCards,
             onBack = { currentPage = HomePage.Summary },
-            onAddCard = { card ->
-                onStateChange(state.copy(homeVisibleCards = state.homeVisibleCards + card))
+            onToggleCard = { card ->
+                onStateChange(
+                    state.copy(
+                        homeVisibleCards = if (card in state.homeVisibleCards) {
+                            state.homeVisibleCards - card
+                        } else {
+                            state.homeVisibleCards + card
+                        }
+                    )
+                )
             },
-            onRemoveCard = { card ->
-                onStateChange(state.copy(homeVisibleCards = state.homeVisibleCards - card))
+            onReorderCards = { reorderedCards ->
+                onStateChange(state.copy(homeCardOrder = reorderedCards))
             }
         )
     }
@@ -500,16 +526,14 @@ private fun HomeSummaryCardBlock(
 ) {
     when (card) {
         HomeSummaryCard.Steps -> HomeMetricCard(
-            label = "步数",
-            title = "今日步数",
+            title = "步数",
             value = if (healthState.hasTodaySteps) "${healthState.todaySteps}" else "暂无",
             unit = if (healthState.hasTodaySteps) "步" else "",
             summary = if (healthState.hasTodaySteps) null else healthState.statusMessage
         )
 
         HomeSummaryCard.Sleep -> HomeMetricCard(
-            label = "睡眠",
-            title = "昨晚睡眠",
+            title = "睡眠",
             value = if (healthState.hasSleepDuration) formatSleepDuration(healthState.sleepDurationHours) else "暂无",
             unit = "",
             summary = if (healthState.hasSleepDuration) {
@@ -522,8 +546,7 @@ private fun HomeSummaryCardBlock(
         HomeSummaryCard.Score -> HomeScoreCard(scoreState = scoreState)
 
         HomeSummaryCard.Supplements -> HomeStatusCard(
-            label = "补剂",
-            title = "补剂摄入情况",
+            title = "补剂",
             primary = if (state.checkedSupplements.isEmpty()) {
                 "今日未记录"
             } else {
@@ -541,8 +564,7 @@ private fun HomeSummaryCardBlock(
                 healthState = healthState
             )
             HomeStatusCard(
-                label = "训练",
-                title = "训练情况",
+                title = "训练",
                 primary = summary.primary,
                 secondary = summary.secondary
             )
@@ -591,17 +613,14 @@ private fun homeTrainingSummary(
 
 @Composable
 private fun HomeMetricCard(
-    label: String,
     title: String,
     value: String,
     unit: String,
     summary: String?
 ) {
     FitCard {
-        CardLabel(label)
-        Spacer(Modifier.height(4.dp))
-        CardTitle(title)
-        Spacer(Modifier.height(18.dp))
+        HomeSummaryCardTitle(title)
+        Spacer(Modifier.height(16.dp))
 
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -636,48 +655,48 @@ private fun HomeMetricCard(
 
 @Composable
 private fun HomeScoreCard(scoreState: HealthScorePageState) {
+    var playEntryAnimation by remember { mutableStateOf(false) }
+
+    LaunchedEffect(Unit) {
+        playEntryAnimation = true
+    }
+
     FitCard {
-        CardLabel("评分")
-        Spacer(Modifier.height(4.dp))
-        CardTitle("今日健康分")
-        Spacer(Modifier.height(18.dp))
+        HomeSummaryCardTitle("健康分")
+        Spacer(Modifier.height(16.dp))
 
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.Top
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                Text(
-                    text = formatScore(scoreState.totalScore),
-                    fontSize = 38.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = FitBoardColors.textPrimary
-                )
-                Text(
-                    text = "/ 100",
-                    fontSize = 14.sp,
-                    color = FitBoardColors.textSecondary
-                )
-            }
-            ScoreTag(text = scoreState.levelLabel)
-        }
+            Text(
+                text = formatScore(scoreState.totalScore),
+                fontSize = 42.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = FitBoardColors.textPrimary
+            )
 
+            Spacer(Modifier.width(14.dp))
+
+            ScoreOverviewRings(
+                items = scoreState.items,
+                playEntryAnimation = playEntryAnimation,
+                ringSize = 112.dp
+            )
+        }
     }
 }
 
 @Composable
 private fun HomeStatusCard(
-    label: String,
     title: String,
     primary: String,
     secondary: String?
 ) {
     FitCard {
-        CardLabel(label)
-        Spacer(Modifier.height(4.dp))
-        CardTitle(title)
-        Spacer(Modifier.height(18.dp))
+        HomeSummaryCardTitle(title)
+        Spacer(Modifier.height(16.dp))
 
         Text(
             text = primary,
@@ -691,6 +710,16 @@ private fun HomeStatusCard(
             HomeInfoPanel(text = secondary)
         }
     }
+}
+
+@Composable
+private fun HomeSummaryCardTitle(text: String) {
+    Text(
+        text = text,
+        fontSize = 18.sp,
+        fontWeight = FontWeight.SemiBold,
+        color = FitBoardColors.textPrimary
+    )
 }
 
 @Composable
@@ -730,13 +759,106 @@ private fun HomeCardsEmptyState(onEditClick: () -> Unit) {
 
 @Composable
 private fun HomeSummaryEditorPage(
-    selectedCards: Set<HomeSummaryCard>,
+    orderedCards: List<HomeSummaryCard>,
+    visibleCards: Set<HomeSummaryCard>,
     onBack: () -> Unit,
-    onAddCard: (HomeSummaryCard) -> Unit,
-    onRemoveCard: (HomeSummaryCard) -> Unit
+    onToggleCard: (HomeSummaryCard) -> Unit,
+    onReorderCards: (List<HomeSummaryCard>) -> Unit
 ) {
-    val visibleCards = HomeSummaryCard.entries.filter { it in selectedCards }
-    val hiddenCards = HomeSummaryCard.entries.filter { it !in selectedCards }
+    val scope = rememberCoroutineScope()
+    val rowGapPx = with(LocalDensity.current) { 8.dp.toPx() }
+    val defaultRowHeightPx = with(LocalDensity.current) { 60.dp.toPx() }
+    val rowHeights = remember { mutableStateMapOf<HomeSummaryCard, Int>() }
+    val settlingOffsets = remember { mutableStateMapOf<HomeSummaryCard, Float>() }
+    var draggingCard by remember { mutableStateOf<HomeSummaryCard?>(null) }
+    var dragStartIndex by remember { mutableStateOf(-1) }
+    var dragTargetIndex by remember { mutableStateOf(-1) }
+    var dragOffsetY by remember { mutableStateOf(0f) }
+
+    fun rowHeight(card: HomeSummaryCard): Float =
+        rowHeights[card]?.toFloat() ?: defaultRowHeightPx
+
+    fun rowExtent(card: HomeSummaryCard): Float =
+        rowHeight(card) + rowGapPx
+
+    fun slotTop(index: Int): Float {
+        if (index <= 0) {
+            return 0f
+        }
+
+        var top = 0f
+        for (position in 0 until index) {
+            top += rowExtent(orderedCards[position])
+        }
+        return top
+    }
+
+    fun calculateTargetIndex(card: HomeSummaryCard, offsetY: Float): Int {
+        val startIndex = orderedCards.indexOf(card)
+        if (startIndex == -1) {
+            return -1
+        }
+
+        val draggedCenter = slotTop(startIndex) + offsetY + rowHeight(card) / 2f
+        var targetIndex = startIndex
+
+        orderedCards.forEachIndexed { index, otherCard ->
+            if (otherCard == card) {
+                return@forEachIndexed
+            }
+
+            val otherCenter = slotTop(index) + rowHeight(otherCard) / 2f
+            if (index > startIndex && draggedCenter > otherCenter) {
+                targetIndex = index
+            } else if (index < startIndex && draggedCenter < otherCenter) {
+                targetIndex = index
+            }
+        }
+
+        return targetIndex
+    }
+
+    fun reorderCards(card: HomeSummaryCard, targetIndex: Int): List<HomeSummaryCard> {
+        val startIndex = orderedCards.indexOf(card)
+        if (startIndex == -1 || targetIndex == -1 || startIndex == targetIndex) {
+            return orderedCards
+        }
+
+        return orderedCards.toMutableList().apply {
+            removeAt(startIndex)
+            add(targetIndex, card)
+        }
+    }
+
+    fun finishDrag(shouldCommit: Boolean) {
+        val card = draggingCard ?: return
+        val startIndex = dragStartIndex
+        val targetIndex = dragTargetIndex.coerceIn(0, orderedCards.lastIndex)
+        val settleOffset = if (shouldCommit) {
+            dragOffsetY - (slotTop(targetIndex) - slotTop(startIndex))
+        } else {
+            dragOffsetY
+        }
+
+        if (shouldCommit && targetIndex != startIndex && startIndex != -1) {
+            onReorderCards(reorderCards(card, targetIndex))
+        }
+
+        draggingCard = null
+        dragStartIndex = -1
+        dragTargetIndex = -1
+        dragOffsetY = 0f
+
+        if (abs(settleOffset) > 0.5f) {
+            settlingOffsets[card] = settleOffset
+            scope.launch {
+                delay(16)
+                settlingOffsets[card] = 0f
+                delay(220)
+                settlingOffsets.remove(card)
+            }
+        }
+    }
 
     Column(
         modifier = Modifier
@@ -765,45 +887,51 @@ private fun HomeSummaryEditorPage(
         Spacer(Modifier.height(12.dp))
 
         EditorSectionCard(
-            label = "已显示",
-            title = "当前摘要卡片",
-            countText = "${visibleCards.size} 项"
+            label = "摘要",
+            title = "卡片顺序",
+            countText = "${visibleCards.size}/${orderedCards.size}"
         ) {
-            if (visibleCards.isEmpty()) {
+            if (orderedCards.isEmpty()) {
                 EmptyEditorState(text = "暂无卡片")
             } else {
-                visibleCards.forEachIndexed { index, card ->
-                    EditorCardRow(
-                        title = card.title,
-                        actionLabel = "移除",
-                        actionSymbol = "-",
-                        onAction = { onRemoveCard(card) }
-                    )
-                    if (index != visibleCards.lastIndex) {
-                        Spacer(Modifier.height(8.dp))
+                orderedCards.forEachIndexed { index, card ->
+                    val currentIndex = orderedCards.indexOf(card)
+                    val isDragging = draggingCard == card
+                    val placeholderShift = when {
+                        draggingCard == null || currentIndex == -1 -> 0f
+                        dragTargetIndex > dragStartIndex &&
+                            currentIndex in (dragStartIndex + 1)..dragTargetIndex -> -rowExtent(draggingCard!!)
+                        dragTargetIndex < dragStartIndex &&
+                            currentIndex in dragTargetIndex until dragStartIndex -> rowExtent(draggingCard!!)
+                        else -> 0f
                     }
-                }
-            }
-        }
 
-        Spacer(Modifier.height(12.dp))
-
-        EditorSectionCard(
-            label = "可添加",
-            title = "候选摘要卡片",
-            countText = "${hiddenCards.size} 项"
-        ) {
-            if (hiddenCards.isEmpty()) {
-                EmptyEditorState(text = "已全部添加")
-            } else {
-                hiddenCards.forEachIndexed { index, card ->
-                    EditorCardRow(
+                    SortableEditorCardRow(
                         title = card.title,
-                        actionLabel = "添加",
-                        actionSymbol = "+",
-                        onAction = { onAddCard(card) }
+                        isVisible = card in visibleCards,
+                        isDragging = isDragging,
+                        dragTranslationY = if (isDragging) dragOffsetY else 0f,
+                        placeholderShiftY = if (isDragging) 0f else placeholderShift,
+                        settlingShiftY = settlingOffsets[card] ?: 0f,
+                        onToggle = { onToggleCard(card) },
+                        onHeightChanged = { rowHeights[card] = it },
+                        onDragStart = {
+                            draggingCard = card
+                            dragStartIndex = currentIndex
+                            dragTargetIndex = currentIndex
+                            dragOffsetY = 0f
+                            settlingOffsets.remove(card)
+                        },
+                        onDrag = { dragDelta ->
+                            dragOffsetY += dragDelta
+                            dragTargetIndex = calculateTargetIndex(card, dragOffsetY)
+                        },
+                        onDragEnd = { finishDrag(shouldCommit = true) },
+                        onDragCancel = {
+                            finishDrag(shouldCommit = false)
+                        }
                     )
-                    if (index != hiddenCards.lastIndex) {
+                    if (index != orderedCards.lastIndex) {
                         Spacer(Modifier.height(8.dp))
                     }
                 }
@@ -853,22 +981,80 @@ private fun EditorSectionCard(
 }
 
 @Composable
-private fun EditorCardRow(
+private fun SortableEditorCardRow(
     title: String,
-    actionLabel: String,
-    actionSymbol: String,
-    onAction: () -> Unit
+    isVisible: Boolean,
+    isDragging: Boolean,
+    dragTranslationY: Float,
+    placeholderShiftY: Float,
+    settlingShiftY: Float,
+    onToggle: () -> Unit,
+    onHeightChanged: (Int) -> Unit,
+    onDragStart: () -> Unit,
+    onDrag: (Float) -> Unit,
+    onDragEnd: () -> Unit,
+    onDragCancel: () -> Unit
 ) {
+    val rowShape = RoundedCornerShape(18.dp)
+    val restingBackground = FitBoardColors.innerPanelBg
+    val liftedBackground by animateColorAsState(
+        targetValue = if (isDragging) FitBoardColors.cardBg else restingBackground,
+        animationSpec = tween(durationMillis = 180, easing = FastOutSlowInEasing),
+        label = "summaryRowBackground"
+    )
+    val rowBorder by animateColorAsState(
+        targetValue = if (isDragging) FitBoardColors.activeCardBorder else FitBoardColors.innerPanelBorder,
+        animationSpec = tween(durationMillis = 180, easing = FastOutSlowInEasing),
+        label = "summaryRowBorder"
+    )
+    val rowScale by animateFloatAsState(
+        targetValue = if (isDragging) 1.035f else 1f,
+        animationSpec = tween(durationMillis = 180, easing = FastOutSlowInEasing),
+        label = "summaryRowScale"
+    )
+    val rowElevation by animateFloatAsState(
+        targetValue = if (isDragging) 18f else 0f,
+        animationSpec = tween(durationMillis = 180, easing = FastOutSlowInEasing),
+        label = "summaryRowElevation"
+    )
+    val passiveTranslationY by animateFloatAsState(
+        targetValue = if (abs(settlingShiftY) > 0.5f) settlingShiftY else placeholderShiftY,
+        animationSpec = spring(
+            dampingRatio = 0.82f,
+            stiffness = 420f
+        ),
+        label = "summaryRowPassiveTranslation"
+    )
+    val appliedTranslationY = if (isDragging) dragTranslationY else passiveTranslationY
+
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(18.dp))
-            .border(1.dp, FitBoardColors.innerPanelBorder, RoundedCornerShape(18.dp))
-            .background(FitBoardColors.innerPanelBg)
+            .zIndex(if (isDragging) 6f else 0f)
+            .graphicsLayer {
+                translationY = appliedTranslationY
+                scaleX = rowScale
+                scaleY = rowScale
+                shadowElevation = rowElevation
+                shape = rowShape
+                clip = false
+            }
+            .clip(rowShape)
+            .border(1.dp, rowBorder, rowShape)
+            .background(liftedBackground)
+            .onSizeChanged { onHeightChanged(it.height) }
             .padding(horizontal = 14.dp, vertical = 14.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
+        DragHandleButton(
+            isDragging = isDragging,
+            onDragStart = onDragStart,
+            onDrag = onDrag,
+            onDragEnd = onDragEnd,
+            onDragCancel = onDragCancel
+        )
+
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = title,
@@ -878,20 +1064,72 @@ private fun EditorCardRow(
             )
         }
 
-        Spacer(Modifier.width(12.dp))
-
-        EditorActionButton(
-            label = actionLabel,
-            symbol = actionSymbol,
-            onClick = onAction
+        EditorVisibilityButton(
+            isVisible = isVisible,
+            onClick = onToggle
         )
     }
 }
 
 @Composable
-private fun EditorActionButton(
-    label: String,
-    symbol: String,
+private fun DragHandleButton(
+    isDragging: Boolean,
+    onDragStart: () -> Unit,
+    onDrag: (Float) -> Unit,
+    onDragEnd: () -> Unit,
+    onDragCancel: () -> Unit
+) {
+    val handleShape = RoundedCornerShape(12.dp)
+    val handleBorder by animateColorAsState(
+        targetValue = if (isDragging) FitBoardColors.activeCardBorder else FitBoardColors.innerPanelBorder,
+        animationSpec = tween(durationMillis = 160, easing = FastOutSlowInEasing),
+        label = "summaryHandleBorder"
+    )
+    val handleBackground by animateColorAsState(
+        targetValue = if (isDragging) FitBoardColors.activeCardBg else FitBoardColors.cardBg,
+        animationSpec = tween(durationMillis = 160, easing = FastOutSlowInEasing),
+        label = "summaryHandleBackground"
+    )
+    val handleScale by animateFloatAsState(
+        targetValue = if (isDragging) 0.98f else 1f,
+        animationSpec = tween(durationMillis = 160, easing = FastOutSlowInEasing),
+        label = "summaryHandleScale"
+    )
+
+    Box(
+        modifier = Modifier
+            .size(32.dp)
+            .graphicsLayer {
+                scaleX = handleScale
+                scaleY = handleScale
+            }
+            .clip(handleShape)
+            .border(1.dp, handleBorder, handleShape)
+            .background(handleBackground)
+            .pointerInput(Unit) {
+                detectDragGesturesAfterLongPress(
+                    onDragStart = { onDragStart() },
+                    onDragEnd = { onDragEnd() },
+                    onDragCancel = { onDragCancel() },
+                    onDrag = { change, dragAmount ->
+                        change.consume()
+                        onDrag(dragAmount.y)
+                    }
+                )
+            },
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = "⋮⋮",
+            fontSize = 14.sp,
+            color = FitBoardColors.textSecondary
+        )
+    }
+}
+
+@Composable
+private fun EditorVisibilityButton(
+    isVisible: Boolean,
     onClick: () -> Unit
 ) {
     Row(
@@ -906,22 +1144,26 @@ private fun EditorActionButton(
             modifier = Modifier
                 .size(24.dp)
                 .clip(CircleShape)
-                .border(1.dp, FitBoardColors.activeCardBorder, CircleShape)
-                .background(FitBoardColors.activeCardBg),
+                .border(
+                    1.dp,
+                    if (isVisible) FitBoardColors.activeCardBorder else FitBoardColors.innerPanelBorder,
+                    CircleShape
+                )
+                .background(if (isVisible) FitBoardColors.activeCardBg else FitBoardColors.cardBg),
             contentAlignment = Alignment.Center
         ) {
             Text(
-                text = symbol,
+                text = if (isVisible) "✓" else "",
                 fontSize = 14.sp,
                 fontWeight = FontWeight.Medium,
                 color = FitBoardColors.activeText
             )
         }
         Text(
-            text = label,
+            text = if (isVisible) "已显示" else "已隐藏",
             fontSize = 13.sp,
             fontWeight = FontWeight.Medium,
-            color = FitBoardColors.activeText
+            color = if (isVisible) FitBoardColors.activeText else FitBoardColors.textSecondary
         )
     }
 }

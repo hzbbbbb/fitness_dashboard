@@ -93,6 +93,7 @@ internal actual object FitBoardFileStorePlatform {
             trainingItems = json.optTrainingItemList("trainingItems"),
             trainingOptions = json.optStringList("trainingOptions"),
             supplementOptions = json.optStringList("supplementOptions"),
+            homeCardOrder = json.optStringList("homeCardOrder"),
             homeVisibleCards = json.optStringList("homeVisibleCards")
         )
     }
@@ -150,6 +151,7 @@ private fun StoredAppConfig.toJson(): JSONObject {
         put("trainingItems", JSONArray(trainingItems.map(StoredTrainingItem::toJson)))
         put("trainingOptions", JSONArray(trainingOptions))
         put("supplementOptions", JSONArray(supplementOptions))
+        put("homeCardOrder", JSONArray(homeCardOrder))
         put("homeVisibleCards", JSONArray(homeVisibleCards))
     }
 }

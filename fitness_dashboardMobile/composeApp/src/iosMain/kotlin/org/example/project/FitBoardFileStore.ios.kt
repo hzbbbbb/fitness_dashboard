@@ -118,6 +118,7 @@ private fun parseConfig(json: Map<*, *>): StoredAppConfig {
         trainingItems = json.trainingItemList("trainingItems"),
         trainingOptions = json.stringList("trainingOptions"),
         supplementOptions = json.stringList("supplementOptions"),
+        homeCardOrder = json.stringList("homeCardOrder"),
         homeVisibleCards = json.stringList("homeVisibleCards")
     )
 }
@@ -176,6 +177,7 @@ private fun StoredAppConfig.toJsonObject(): Map<String, Any?> {
         "trainingItems" to trainingItems.map(StoredTrainingItem::toJsonObject),
         "trainingOptions" to trainingOptions,
         "supplementOptions" to supplementOptions,
+        "homeCardOrder" to homeCardOrder,
         "homeVisibleCards" to homeVisibleCards
     )
 }

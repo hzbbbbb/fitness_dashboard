@@ -35,7 +35,8 @@ import kotlinx.coroutines.delay
 // ─── Default Option Lists ──────────────────────────────────────────────────────
 
 internal val DEFAULT_SUPPLEMENT_OPTIONS = listOf("蛋白粉", "肌酸", "咖啡因", "鱼油", "维生素")
-internal val DEFAULT_HOME_VISIBLE_CARDS = HomeSummaryCard.entries.toSet()
+internal val DEFAULT_HOME_CARD_ORDER = HomeSummaryCard.entries.toList()
+internal val DEFAULT_HOME_VISIBLE_CARDS = DEFAULT_HOME_CARD_ORDER.toSet()
 private const val RECORD_TEXT_AUTOSAVE_DEBOUNCE_MS = 350L
 internal const val TRAINING_DURATION_STEP_MINUTES = 5
 internal const val TRAINING_DURATION_MIN_MINUTES = 0
@@ -108,6 +109,7 @@ data class AppUiState(
     val stepGoal: Int = 8000,
     val trainingItems: List<TrainingItemConfig> = DEFAULT_TRAINING_ITEMS,
     val supplementOptions: List<String> = DEFAULT_SUPPLEMENT_OPTIONS,
+    val homeCardOrder: List<HomeSummaryCard> = DEFAULT_HOME_CARD_ORDER,
     val homeVisibleCards: Set<HomeSummaryCard> = DEFAULT_HOME_VISIBLE_CARDS
 ) {
     val trainingOptions: List<String>
@@ -118,7 +120,38 @@ internal fun AppUiState.hasAnyRecord(): Boolean =
     selectedTraining != null || checkedSupplements.isNotEmpty() || savedWeight != null || note.isNotBlank()
 
 internal fun AppUiState.homeCardsInDisplayOrder(): List<HomeSummaryCard> =
-    HomeSummaryCard.entries.filter { it in homeVisibleCards }
+    orderedHomeCards().filter { it in homeVisibleCards }
+
+internal fun AppUiState.orderedHomeCards(): List<HomeSummaryCard> {
+    val normalizedOrder = homeCardOrder
+        .distinct()
+        .filter { it in HomeSummaryCard.entries }
+
+    if (normalizedOrder.size == HomeSummaryCard.entries.size) {
+        return normalizedOrder
+    }
+
+    return normalizedOrder + HomeSummaryCard.entries.filter { it !in normalizedOrder }
+}
+
+internal fun AppUiState.moveHomeCard(card: HomeSummaryCard, offset: Int): AppUiState {
+    val orderedCards = orderedHomeCards()
+    val currentIndex = orderedCards.indexOf(card)
+    if (currentIndex == -1) {
+        return this
+    }
+
+    val targetIndex = (currentIndex + offset).coerceIn(0, orderedCards.lastIndex)
+    if (targetIndex == currentIndex) {
+        return this
+    }
+
+    val updatedCards = orderedCards.toMutableList().apply {
+        removeAt(currentIndex)
+        add(targetIndex, card)
+    }
+    return copy(homeCardOrder = updatedCards)
+}
 
 internal fun AppUiState.trainingItemsIn(category: TrainingCategory): List<TrainingItemConfig> =
     trainingItems.filter { it.category == category }
@@ -288,6 +321,7 @@ fun MainScaffold() {
         appState.stepGoal,
         appState.trainingItems,
         appState.supplementOptions,
+        appState.homeCardOrder,
         appState.homeVisibleCards
     ) {
         if (hasLoadedPersistence) {

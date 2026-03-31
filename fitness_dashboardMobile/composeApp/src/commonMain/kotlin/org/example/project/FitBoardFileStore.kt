@@ -19,6 +19,7 @@ internal data class StoredAppConfig(
     val trainingItems: List<StoredTrainingItem> = DEFAULT_TRAINING_ITEMS.map(TrainingItemConfig::toStoredItem),
     val trainingOptions: List<String> = DEFAULT_TRAINING_OPTIONS,
     val supplementOptions: List<String> = DEFAULT_SUPPLEMENT_OPTIONS,
+    val homeCardOrder: List<String> = DEFAULT_HOME_CARD_ORDER.map(HomeSummaryCard::name),
     val homeVisibleCards: List<String> = HomeSummaryCard.entries.map(HomeSummaryCard::name)
 )
 
@@ -130,6 +131,8 @@ private fun StoredAppConfig.sanitize(): StoredAppConfig {
         trainingItems = trainingItems,
         legacyOptions = trainingOptions
     )
+    val safeHomeCardOrder = sanitizeHomeCardOrder(homeCardOrder)
+    val safeHomeVisibleCards = sanitizeHomeVisibleCards(homeVisibleCards)
 
     return copy(
         schemaVersion = FIT_BOARD_SCHEMA_VERSION,
@@ -139,7 +142,8 @@ private fun StoredAppConfig.sanitize(): StoredAppConfig {
         trainingItems = safeTrainingItems,
         trainingOptions = safeTrainingItems.map(StoredTrainingItem::name),
         supplementOptions = sanitizeOptions(supplementOptions, DEFAULT_SUPPLEMENT_OPTIONS),
-        homeVisibleCards = sanitizeHomeVisibleCards(homeVisibleCards)
+        homeCardOrder = safeHomeCardOrder,
+        homeVisibleCards = safeHomeVisibleCards
     )
 }
 
@@ -214,6 +218,7 @@ private fun AppUiState.toStoredConfig(): StoredAppConfig {
         trainingItems = sanitizeTrainingItems(trainingItems).map(TrainingItemConfig::toStoredItem),
         trainingOptions = trainingOptions,
         supplementOptions = sanitizeOptions(supplementOptions, DEFAULT_SUPPLEMENT_OPTIONS),
+        homeCardOrder = orderedHomeCards().map(HomeSummaryCard::name),
         homeVisibleCards = homeCardsInDisplayOrder().map(HomeSummaryCard::name)
     )
 }
@@ -253,6 +258,7 @@ private fun StoredDailyRecord.toAppUiState(config: StoredAppConfig): AppUiState 
         stepGoal = config.stepGoal,
         trainingItems = config.trainingItems.map(StoredTrainingItem::toTrainingItemConfig),
         supplementOptions = config.supplementOptions,
+        homeCardOrder = parseHomeCardOrder(config.homeCardOrder),
         homeVisibleCards = parseHomeVisibleCards(config.homeVisibleCards)
     )
 }
@@ -377,6 +383,22 @@ private fun sanitizeHomeVisibleCards(values: List<String>): List<String> {
         emptyList()
     } else {
         HomeSummaryCard.entries.filter { it in parsed }.map(HomeSummaryCard::name)
+    }
+}
+
+private fun sanitizeHomeCardOrder(values: List<String>): List<String> {
+    return parseHomeCardOrder(values).map(HomeSummaryCard::name)
+}
+
+private fun parseHomeCardOrder(values: List<String>): List<HomeSummaryCard> {
+    val parsed = values.mapNotNull { name ->
+        HomeSummaryCard.entries.firstOrNull { it.name == name }
+    }.distinct()
+
+    return if (parsed.isEmpty()) {
+        DEFAULT_HOME_CARD_ORDER
+    } else {
+        parsed + HomeSummaryCard.entries.filter { it !in parsed }
     }
 }
 
