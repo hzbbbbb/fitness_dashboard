@@ -108,6 +108,11 @@ internal actual object FitBoardFileStorePlatform {
             selectedSupplements = json.optStringList("selectedSupplements"),
             note = json.optString("note", ""),
             isSaved = json.optBoolean("isSaved", false),
+            sleepScore = json.optDoubleOrNull("sleepScore"),
+            stepScore = json.optDoubleOrNull("stepScore"),
+            trainingScore = json.optDoubleOrNull("trainingScore"),
+            supplementScore = json.optDoubleOrNull("supplementScore"),
+            healthScoreTotal = json.optIntOrNull("healthScoreTotal"),
             healthSummary = StoredHealthSummary(
                 authorizationState = healthJson?.optString(
                     "authorizationState",
@@ -165,6 +170,11 @@ private fun StoredDailyRecord.toJson(): JSONObject {
         put("selectedSupplements", JSONArray(selectedSupplements))
         put("note", note)
         put("isSaved", isSaved)
+        put("sleepScore", sleepScore)
+        put("stepScore", stepScore)
+        put("trainingScore", trainingScore)
+        put("supplementScore", supplementScore)
+        put("healthScoreTotal", healthScoreTotal)
         put(
             "healthSummary",
             JSONObject().apply {
@@ -245,6 +255,20 @@ private fun JSONObject.optStringOrNull(key: String): String? {
         return null
     }
     return optString(key).trim().takeIf { it.isNotEmpty() }
+}
+
+private fun JSONObject.optIntOrNull(key: String): Int? {
+    if (!has(key) || isNull(key)) {
+        return null
+    }
+    return optInt(key)
+}
+
+private fun JSONObject.optDoubleOrNull(key: String): Double? {
+    if (!has(key) || isNull(key)) {
+        return null
+    }
+    return optDouble(key)
 }
 
 private fun recordPath(date: String): String = "$FIT_BOARD_RECORDS_DIR/$date.json"

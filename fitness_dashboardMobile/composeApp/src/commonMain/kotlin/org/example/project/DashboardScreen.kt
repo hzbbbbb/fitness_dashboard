@@ -59,12 +59,13 @@ private const val HEATMAP_WEEKS = 13
 private val HeatmapCardBorderColor = Color(0xFFE1E6EE)
 private val HeatmapPanelColor = Color(0xFFF4F7FB)
 private val HeatmapPanelBorderColor = Color(0xFFE4EAF2)
-private val HeatmapEmptyCellColor = Color(0xFFE3E9F2)
-private val HeatmapLevel1Color = Color(0xFFD5E2F8)
-private val HeatmapLevel2Color = Color(0xFFB7D0F6)
-private val HeatmapLevel3Color = Color(0xFF8EB4F0)
-private val HeatmapLevel4Color = Color(0xFF5F8FE0)
-private val HeatmapLevel5Color = Color(0xFF275FCA)
+private val HeatmapEmptyCellColor = Color(0xFFE4EAF3)
+private val HeatmapLevel1Color = Color(0xFFDCE7F8)
+private val HeatmapLevel2Color = Color(0xFFC2D7F7)
+private val HeatmapLevel3Color = Color(0xFF9EBEEE)
+private val HeatmapLevel4Color = Color(0xFF7099E5)
+private val HeatmapLevel5Color = Color(0xFF4678DA)
+private val HeatmapLevel6Color = Color(0xFF163F97)
 
 private data class HeatmapModel(
     val weeks: List<HeatmapWeekColumn>
@@ -94,7 +95,8 @@ private enum class HeatmapScoreLevel {
     Level2,
     Level3,
     Level4,
-    Level5
+    Level5,
+    Level6
 }
 
 @Composable
@@ -167,6 +169,7 @@ private fun HomeSummaryPage(
         state.sleepGoalHours,
         state.sleepGoalMinutes,
         state.stepGoal,
+        state.trainingItems,
         state.supplementOptions,
         state.selectedTraining,
         state.checkedSupplements,
@@ -174,7 +177,14 @@ private fun HomeSummaryPage(
         healthState.todaySteps,
         healthState.hasTodaySteps,
         healthState.sleepDurationHours,
-        healthState.hasSleepDuration
+        healthState.hasSleepDuration,
+        healthState.workoutType,
+        healthState.workoutDurationMinutes,
+        healthState.hasWorkout,
+        healthState.scorePrimaryWorkoutType,
+        healthState.scorePrimaryWorkoutDurationMinutes,
+        healthState.scoreAdditionalWorkoutDurationMinutes,
+        healthState.scoreAdditionalWorkoutsRaw
     ) {
         buildHeatmapModel(
             today = todayDate,
@@ -424,12 +434,7 @@ private fun buildHeatmapModel(
                         state = currentState,
                         healthState = currentHealthState
                     )
-                    else -> historicalRecords[dateKey]?.let { record ->
-                        buildHeatmapScore(
-                            state = record.toHistoricalAppUiState(referenceState = currentState),
-                            healthState = record.healthSummary.toUiState()
-                        )
-                    }
+                    else -> historicalRecords[dateKey]?.healthScoreTotal
                 }
 
                 HeatmapDayCell(
@@ -477,6 +482,7 @@ private fun hasHeatmapScoreData(
 ): Boolean {
     return healthState.hasTodaySteps ||
         healthState.hasSleepDuration ||
+        healthState.hasWorkout ||
         state.selectedTraining != null ||
         state.checkedSupplements.isNotEmpty()
 }
@@ -500,8 +506,9 @@ private fun heatmapLevelForScore(score: Int?): HeatmapScoreLevel {
         score <= 20 -> HeatmapScoreLevel.Level1
         score <= 40 -> HeatmapScoreLevel.Level2
         score <= 60 -> HeatmapScoreLevel.Level3
-        score <= 80 -> HeatmapScoreLevel.Level4
-        else -> HeatmapScoreLevel.Level5
+        score <= 75 -> HeatmapScoreLevel.Level4
+        score <= 89 -> HeatmapScoreLevel.Level5
+        else -> HeatmapScoreLevel.Level6
     }
 }
 
@@ -514,6 +521,7 @@ private fun heatmapColorForLevel(level: HeatmapScoreLevel): Color {
         HeatmapScoreLevel.Level3 -> HeatmapLevel3Color
         HeatmapScoreLevel.Level4 -> HeatmapLevel4Color
         HeatmapScoreLevel.Level5 -> HeatmapLevel5Color
+        HeatmapScoreLevel.Level6 -> HeatmapLevel6Color
     }
 }
 

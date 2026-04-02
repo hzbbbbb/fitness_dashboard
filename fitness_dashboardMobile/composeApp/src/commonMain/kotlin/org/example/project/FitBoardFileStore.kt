@@ -1,9 +1,12 @@
 package org.example.project
 
+import kotlin.math.roundToInt
+
 internal const val FIT_BOARD_STORAGE_ROOT = "FitBoard"
 internal const val FIT_BOARD_CONFIG_PATH = "$FIT_BOARD_STORAGE_ROOT/config.json"
 internal const val FIT_BOARD_RECORDS_DIR = "$FIT_BOARD_STORAGE_ROOT/records"
 private const val FIT_BOARD_SCHEMA_VERSION = 1
+private const val HISTORICAL_SCORE_BACKFILL_DAYS = 14
 
 internal data class StoredTrainingItem(
     val name: String,
@@ -54,6 +57,11 @@ internal data class StoredDailyRecord(
     val selectedSupplements: List<String> = emptyList(),
     val note: String = "",
     val isSaved: Boolean = false,
+    val sleepScore: Double? = null,
+    val stepScore: Double? = null,
+    val trainingScore: Double? = null,
+    val supplementScore: Double? = null,
+    val healthScoreTotal: Int? = null,
     val healthSummary: StoredHealthSummary = StoredHealthSummary()
 )
 
@@ -104,12 +112,45 @@ internal object FitBoardFileStore {
     }
 
     fun loadHistoricalDailyRecords(dateKeys: List<String>): Map<String, StoredDailyRecord> {
+        val storedConfig = FitBoardFileStorePlatform
+            .loadOrCreateConfig(StoredAppConfig())
+            .sanitize()
+        val backfillDateKeys = dateKeys
+            .distinct()
+            .sorted()
+            .takeLast(HISTORICAL_SCORE_BACKFILL_DAYS)
+            .toSet()
+
         return buildMap {
             dateKeys.distinct().forEach { dateKey ->
-                val record = FitBoardFileStorePlatform
+                val storedRecord = FitBoardFileStorePlatform
                     .loadDailyRecordOrNull(dateKey)
-                    ?.sanitizeForHistory(todayKey = dateKey)
                     ?: return@forEach
+                var record = storedRecord.sanitizeForHistory(todayKey = dateKey)
+
+                if (dateKey in backfillDateKeys && record.needsStoredHealthScoreBackfill()) {
+                    val normalizedRecord = storedRecord.sanitize(
+                        todayKey = dateKey,
+                        config = storedConfig
+                    )
+                    val backfilledScores = buildStoredHealthScores(
+                        state = normalizedRecord.toAppUiState(config = storedConfig),
+                        healthSummary = normalizedRecord.healthSummary.toUiState()
+                    )
+
+                    if (backfilledScores != null) {
+                        val backfilledRecord = storedRecord.copy(
+                            date = dateKey,
+                            sleepScore = backfilledScores.sleepScore,
+                            stepScore = backfilledScores.stepScore,
+                            trainingScore = backfilledScores.trainingScore,
+                            supplementScore = backfilledScores.supplementScore,
+                            healthScoreTotal = backfilledScores.totalScore
+                        )
+                        FitBoardFileStorePlatform.saveDailyRecord(backfilledRecord)
+                        record = backfilledRecord.sanitizeForHistory(todayKey = dateKey)
+                    }
+                }
 
                 put(dateKey, record)
             }
@@ -175,6 +216,11 @@ private fun StoredDailyRecord.sanitize(
             .filter { it.isNotEmpty() && it in config.supplementOptions }
             .distinct(),
         note = note.take(140),
+        sleepScore = sleepScore?.coerceAtLeast(0.0),
+        stepScore = stepScore?.coerceAtLeast(0.0),
+        trainingScore = trainingScore?.coerceAtLeast(0.0),
+        supplementScore = supplementScore?.coerceAtLeast(0.0),
+        healthScoreTotal = healthScoreTotal?.coerceIn(0, 100),
         healthSummary = healthSummary.sanitize()
     )
 }
@@ -190,6 +236,11 @@ private fun StoredDailyRecord.sanitizeForHistory(todayKey: String): StoredDailyR
             .filter { it.isNotEmpty() }
             .distinct(),
         note = note.take(140),
+        sleepScore = sleepScore?.coerceAtLeast(0.0),
+        stepScore = stepScore?.coerceAtLeast(0.0),
+        trainingScore = trainingScore?.coerceAtLeast(0.0),
+        supplementScore = supplementScore?.coerceAtLeast(0.0),
+        healthScoreTotal = healthScoreTotal?.coerceIn(0, 100),
         healthSummary = healthSummary.sanitize()
     )
 }
@@ -229,6 +280,10 @@ private fun AppUiState.toStoredDailyRecord(
 ): StoredDailyRecord {
     val normalizedWeight = savedWeight?.trim()?.takeIf { it.isNotEmpty() }
         ?: weightInput.trim().takeIf { it.isNotEmpty() }
+    val storedHealthScores = buildStoredHealthScores(
+        state = this,
+        healthSummary = healthSummary
+    )
 
     return StoredDailyRecord(
         date = todayKey,
@@ -237,8 +292,63 @@ private fun AppUiState.toStoredDailyRecord(
         selectedSupplements = checkedSupplements.toList().sorted(),
         note = note.trim(),
         isSaved = true,
+        sleepScore = storedHealthScores?.sleepScore,
+        stepScore = storedHealthScores?.stepScore,
+        trainingScore = storedHealthScores?.trainingScore,
+        supplementScore = storedHealthScores?.supplementScore,
+        healthScoreTotal = storedHealthScores?.totalScore,
         healthSummary = healthSummary.toStoredSummary()
     )
+}
+
+private data class StoredHealthScores(
+    val sleepScore: Double,
+    val stepScore: Double,
+    val trainingScore: Double,
+    val supplementScore: Double,
+    val totalScore: Int
+)
+
+private fun buildStoredHealthScores(
+    state: AppUiState,
+    healthSummary: HealthSummaryUiState
+): StoredHealthScores? {
+    if (!hasPersistableHealthScoreData(state, healthSummary)) {
+        return null
+    }
+
+    val scoreState = buildHealthScoreState(
+        state = state,
+        healthState = healthSummary
+    )
+    val itemsByLabel = scoreState.items.associateBy(HealthScoreItemState::label)
+
+    return StoredHealthScores(
+        sleepScore = itemsByLabel["睡眠"]?.score ?: 0.0,
+        stepScore = itemsByLabel["步数"]?.score ?: 0.0,
+        trainingScore = itemsByLabel["训练"]?.score ?: 0.0,
+        supplementScore = itemsByLabel["补剂"]?.score ?: 0.0,
+        totalScore = scoreState.totalScore.roundToInt().coerceIn(0, 100)
+    )
+}
+
+private fun hasPersistableHealthScoreData(
+    state: AppUiState,
+    healthSummary: HealthSummaryUiState
+): Boolean {
+    return healthSummary.hasTodaySteps ||
+        healthSummary.hasSleepDuration ||
+        healthSummary.hasWorkout ||
+        state.selectedTraining != null ||
+        state.checkedSupplements.isNotEmpty()
+}
+
+private fun StoredDailyRecord.needsStoredHealthScoreBackfill(): Boolean {
+    return sleepScore == null ||
+        stepScore == null ||
+        trainingScore == null ||
+        supplementScore == null ||
+        healthScoreTotal == null
 }
 
 private fun StoredDailyRecord.toAppUiState(config: StoredAppConfig): AppUiState {

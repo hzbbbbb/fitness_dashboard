@@ -133,6 +133,11 @@ private fun parseDailyRecord(json: Map<*, *>, fallbackDate: String): StoredDaily
         selectedSupplements = json.stringList("selectedSupplements"),
         note = json.stringValue("note", ""),
         isSaved = json.boolValue("isSaved", false),
+        sleepScore = json.doubleOrNull("sleepScore"),
+        stepScore = json.doubleOrNull("stepScore"),
+        trainingScore = json.doubleOrNull("trainingScore"),
+        supplementScore = json.doubleOrNull("supplementScore"),
+        healthScoreTotal = json.intOrNull("healthScoreTotal"),
         healthSummary = StoredHealthSummary(
             authorizationState = healthJson?.stringValue(
                 "authorizationState",
@@ -191,6 +196,11 @@ private fun StoredDailyRecord.toJsonObject(): Map<String, Any?> {
         "selectedSupplements" to selectedSupplements,
         "note" to note,
         "isSaved" to isSaved,
+        "sleepScore" to sleepScore,
+        "stepScore" to stepScore,
+        "trainingScore" to trainingScore,
+        "supplementScore" to supplementScore,
+        "healthScoreTotal" to healthScoreTotal,
         "healthSummary" to mapOf(
             "authorizationState" to healthSummary.authorizationState,
             "statusMessage" to healthSummary.statusMessage,
@@ -237,6 +247,22 @@ private fun Map<*, *>.doubleValue(key: String, fallback: Double): Double {
         is Number -> value.toDouble()
         is String -> value.toDoubleOrNull() ?: fallback
         else -> fallback
+    }
+}
+
+private fun Map<*, *>.doubleOrNull(key: String): Double? {
+    return when (val value = this[key]) {
+        is Number -> value.toDouble()
+        is String -> value.toDoubleOrNull()
+        else -> null
+    }
+}
+
+private fun Map<*, *>.intOrNull(key: String): Int? {
+    return when (val value = this[key]) {
+        is Number -> value.toInt()
+        is String -> value.toIntOrNull()
+        else -> null
     }
 }
 
