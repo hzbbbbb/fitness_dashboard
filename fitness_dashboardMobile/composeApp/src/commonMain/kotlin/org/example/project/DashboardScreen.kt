@@ -108,39 +108,45 @@ fun HomeScreen(
 ) {
     var currentPage by remember { mutableStateOf(HomePage.Summary) }
 
-    when (currentPage) {
-        HomePage.Summary -> HomeSummaryPage(
-            state = state,
-            dateInfo = dateInfo,
-            today = today,
-            onEditClick = { currentPage = HomePage.Editor }
-        )
+    FitBoardPageTransition(
+        targetState = currentPage,
+        depth = HomePage::depth,
+        modifier = Modifier.fillMaxSize()
+    ) { page ->
+        when (page) {
+            HomePage.Summary -> HomeSummaryPage(
+                state = state,
+                dateInfo = dateInfo,
+                today = today,
+                onEditClick = { currentPage = HomePage.Editor }
+            )
 
-        HomePage.Editor -> HomeSummaryEditorPage(
-            orderedCards = state.orderedHomeCards(),
-            visibleCards = state.homeVisibleCards,
-            onBack = { currentPage = HomePage.Summary },
-            onToggleCard = { card ->
-                onStateChange(
-                    state.copy(
-                        homeVisibleCards = if (card in state.homeVisibleCards) {
-                            state.homeVisibleCards - card
-                        } else {
-                            state.homeVisibleCards + card
-                        }
+            HomePage.Editor -> HomeSummaryEditorPage(
+                orderedCards = state.orderedHomeCards(),
+                visibleCards = state.homeVisibleCards,
+                onBack = { currentPage = HomePage.Summary },
+                onToggleCard = { card ->
+                    onStateChange(
+                        state.copy(
+                            homeVisibleCards = if (card in state.homeVisibleCards) {
+                                state.homeVisibleCards - card
+                            } else {
+                                state.homeVisibleCards + card
+                            }
+                        )
                     )
-                )
-            },
-            onReorderCards = { reorderedCards ->
-                onStateChange(state.copy(homeCardOrder = reorderedCards))
-            }
-        )
+                },
+                onReorderCards = { reorderedCards ->
+                    onStateChange(state.copy(homeCardOrder = reorderedCards))
+                }
+            )
+        }
     }
 }
 
-private enum class HomePage {
-    Summary,
-    Editor
+private enum class HomePage(val depth: Int) {
+    Summary(0),
+    Editor(1)
 }
 
 @Composable

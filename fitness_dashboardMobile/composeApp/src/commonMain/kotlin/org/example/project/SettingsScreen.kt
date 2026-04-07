@@ -47,142 +47,148 @@ fun SettingsScreen(
 ) {
     var currentPage by remember { mutableStateOf(SettingsPage.Home) }
 
-    when (currentPage) {
-        SettingsPage.Home -> SettingsHomeScreen(
-            state = state,
-            onNavigate = { currentPage = it }
-        )
+    FitBoardPageTransition(
+        targetState = currentPage,
+        depth = SettingsPage::depth,
+        modifier = Modifier.fillMaxSize()
+    ) { page ->
+        when (page) {
+            SettingsPage.Home -> SettingsHomeScreen(
+                state = state,
+                onNavigate = { currentPage = it }
+            )
 
-        SettingsPage.Training -> SettingsSubpageScaffold(
-            title = "训练类型",
-            onBack = { currentPage = SettingsPage.Home }
-        ) {
-            TrainingSettingsSection(
-                items = state.trainingItems,
-                onAdd = { category, name ->
-                    if (name.isNotBlank() && name !in state.trainingOptions) {
-                        onStateChange(
-                            state.copy(
-                                trainingItems = state.trainingItems.insertTrainingItem(
-                                    TrainingItemConfig(
-                                        name = name,
-                                        category = category,
-                                        defaultDurationMinutes = defaultTrainingDurationFor(name, category)
+            SettingsPage.Training -> SettingsSubpageScaffold(
+                title = "训练类型",
+                onBack = { currentPage = SettingsPage.Home }
+            ) {
+                TrainingSettingsSection(
+                    items = state.trainingItems,
+                    onAdd = { category, name ->
+                        if (name.isNotBlank() && name !in state.trainingOptions) {
+                            onStateChange(
+                                state.copy(
+                                    trainingItems = state.trainingItems.insertTrainingItem(
+                                        TrainingItemConfig(
+                                            name = name,
+                                            category = category,
+                                            defaultDurationMinutes = defaultTrainingDurationFor(name, category)
+                                        )
                                     )
                                 )
                             )
-                        )
-                    }
-                },
-                onDelete = { item ->
-                    if (state.trainingItems.count { it.category == item.category } > 1) {
+                        }
+                    },
+                    onDelete = { item ->
+                        if (state.trainingItems.count { it.category == item.category } > 1) {
+                            onStateChange(
+                                state.copy(
+                                    trainingItems = state.trainingItems.filterNot { it.name == item.name },
+                                    selectedTraining = if (state.selectedTraining == item.name) null else state.selectedTraining
+                                )
+                            )
+                        }
+                    },
+                    onDurationChange = { item, duration ->
                         onStateChange(
                             state.copy(
-                                trainingItems = state.trainingItems.filterNot { it.name == item.name },
-                                selectedTraining = if (state.selectedTraining == item.name) null else state.selectedTraining
-                            )
-                        )
-                    }
-                },
-                onDurationChange = { item, duration ->
-                    onStateChange(
-                        state.copy(
-                            trainingItems = state.trainingItems.map { current ->
-                                if (current.name == item.name) {
-                                    current.copy(
-                                        defaultDurationMinutes = normalizeTrainingDurationMinutes(duration)
-                                    )
-                                } else {
-                                    current
+                                trainingItems = state.trainingItems.map { current ->
+                                    if (current.name == item.name) {
+                                        current.copy(
+                                            defaultDurationMinutes = normalizeTrainingDurationMinutes(duration)
+                                        )
+                                    } else {
+                                        current
+                                    }
                                 }
-                            }
-                        )
-                    )
-                }
-            )
-        }
-
-        SettingsPage.Supplement -> SettingsSubpageScaffold(
-            title = "补剂类型",
-            onBack = { currentPage = SettingsPage.Home }
-        ) {
-            SupplementSettingsSection(
-                options = state.supplementOptions,
-                onAdd = { name ->
-                    if (name.isNotBlank() && name !in state.supplementOptions) {
-                        onStateChange(state.copy(supplementOptions = state.supplementOptions + name))
-                    }
-                },
-                onDelete = { name ->
-                    if (state.supplementOptions.size > 1) {
-                        onStateChange(
-                            state.copy(
-                                supplementOptions = state.supplementOptions - name,
-                                checkedSupplements = state.checkedSupplements - name
                             )
                         )
                     }
-                }
-            )
-        }
+                )
+            }
 
-        SettingsPage.SleepGoal -> SettingsSubpageScaffold(
-            title = "睡眠目标",
-            onBack = { currentPage = SettingsPage.Home }
-        ) {
-            SleepGoalSettingsCard(
-                selectedHour = state.sleepGoalHours,
-                selectedMinute = state.sleepGoalMinutes,
-                onSelectHour = { onStateChange(state.copy(sleepGoalHours = it)) },
-                onSelectMinute = { onStateChange(state.copy(sleepGoalMinutes = it)) }
-            )
-        }
+            SettingsPage.Supplement -> SettingsSubpageScaffold(
+                title = "补剂类型",
+                onBack = { currentPage = SettingsPage.Home }
+            ) {
+                SupplementSettingsSection(
+                    options = state.supplementOptions,
+                    onAdd = { name ->
+                        if (name.isNotBlank() && name !in state.supplementOptions) {
+                            onStateChange(state.copy(supplementOptions = state.supplementOptions + name))
+                        }
+                    },
+                    onDelete = { name ->
+                        if (state.supplementOptions.size > 1) {
+                            onStateChange(
+                                state.copy(
+                                    supplementOptions = state.supplementOptions - name,
+                                    checkedSupplements = state.checkedSupplements - name
+                                )
+                            )
+                        }
+                    }
+                )
+            }
 
-        SettingsPage.StepGoal -> SettingsSubpageScaffold(
-            title = "步数目标",
-            onBack = { currentPage = SettingsPage.Home }
-        ) {
-            StepGoalSettingsCard(
-                selectedStepGoal = state.stepGoal,
-                onSelectStepGoal = { onStateChange(state.copy(stepGoal = it)) }
-            )
-        }
+            SettingsPage.SleepGoal -> SettingsSubpageScaffold(
+                title = "睡眠目标",
+                onBack = { currentPage = SettingsPage.Home }
+            ) {
+                SleepGoalSettingsCard(
+                    selectedHour = state.sleepGoalHours,
+                    selectedMinute = state.sleepGoalMinutes,
+                    onSelectHour = { onStateChange(state.copy(sleepGoalHours = it)) },
+                    onSelectMinute = { onStateChange(state.copy(sleepGoalMinutes = it)) }
+                )
+            }
 
-        SettingsPage.Style -> SettingsSubpageScaffold(
-            title = "风格",
-            onBack = { currentPage = SettingsPage.Home }
-        ) {
-            StyleSettingsSection(
-                themeMode = state.themeMode,
-                onThemeChange = { onStateChange(state.copy(themeMode = it)) }
-            )
-        }
+            SettingsPage.StepGoal -> SettingsSubpageScaffold(
+                title = "步数目标",
+                onBack = { currentPage = SettingsPage.Home }
+            ) {
+                StepGoalSettingsCard(
+                    selectedStepGoal = state.stepGoal,
+                    onSelectStepGoal = { onStateChange(state.copy(stepGoal = it)) }
+                )
+            }
 
-        SettingsPage.LocalData -> SettingsSubpageScaffold(
-            title = "本地数据",
-            onBack = { currentPage = SettingsPage.Home }
-        ) {
-            LocalDataSection()
-        }
+            SettingsPage.Style -> SettingsSubpageScaffold(
+                title = "风格",
+                onBack = { currentPage = SettingsPage.Home }
+            ) {
+                StyleSettingsSection(
+                    themeMode = state.themeMode,
+                    onThemeChange = { onStateChange(state.copy(themeMode = it)) }
+                )
+            }
 
-        SettingsPage.About -> SettingsSubpageScaffold(
-            title = "关于",
-            onBack = { currentPage = SettingsPage.Home }
-        ) {
-            AboutSection()
+            SettingsPage.LocalData -> SettingsSubpageScaffold(
+                title = "本地数据",
+                onBack = { currentPage = SettingsPage.Home }
+            ) {
+                LocalDataSection()
+            }
+
+            SettingsPage.About -> SettingsSubpageScaffold(
+                title = "关于",
+                onBack = { currentPage = SettingsPage.Home }
+            ) {
+                AboutSection()
+            }
         }
     }
 }
 
-private enum class SettingsPage {
-    Home,
-    Training,
-    Supplement,
-    SleepGoal,
-    StepGoal,
-    Style,
-    LocalData,
-    About
+private enum class SettingsPage(val depth: Int) {
+    Home(0),
+    Training(1),
+    Supplement(1),
+    SleepGoal(1),
+    StepGoal(1),
+    Style(1),
+    LocalData(1),
+    About(1)
 }
 
 @Composable

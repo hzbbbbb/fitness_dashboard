@@ -124,6 +124,9 @@ internal actual object FitBoardFileStorePlatform {
                 hasTodaySteps = healthJson?.optBoolean("hasTodaySteps", false) ?: false,
                 sleepDurationHours = healthJson?.optDouble("sleepDurationHours", 0.0) ?: 0.0,
                 hasSleepDuration = healthJson?.optBoolean("hasSleepDuration", false) ?: false,
+                todayWeightKilograms = healthJson?.optDouble("todayWeightKilograms", 0.0) ?: 0.0,
+                hasTodayWeight = healthJson?.optBoolean("hasTodayWeight", false) ?: false,
+                weightHistoryRaw = healthJson?.optString("weightHistoryRaw", "") ?: "",
                 workoutType = healthJson?.optString("workoutType", "") ?: "",
                 workoutDurationMinutes = healthJson?.optDouble("workoutDurationMinutes", 0.0) ?: 0.0,
                 hasWorkout = healthJson?.optBoolean("hasWorkout", false) ?: false,
@@ -184,6 +187,9 @@ private fun StoredDailyRecord.toJson(): JSONObject {
                 put("hasTodaySteps", healthSummary.hasTodaySteps)
                 put("sleepDurationHours", healthSummary.sleepDurationHours)
                 put("hasSleepDuration", healthSummary.hasSleepDuration)
+                put("todayWeightKilograms", healthSummary.todayWeightKilograms)
+                put("hasTodayWeight", healthSummary.hasTodayWeight)
+                put("weightHistoryRaw", healthSummary.weightHistoryRaw)
                 put("workoutType", healthSummary.workoutType)
                 put("workoutDurationMinutes", healthSummary.workoutDurationMinutes)
                 put("hasWorkout", healthSummary.hasWorkout)

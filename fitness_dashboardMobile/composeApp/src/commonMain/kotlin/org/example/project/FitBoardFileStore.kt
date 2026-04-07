@@ -33,6 +33,9 @@ internal data class StoredHealthSummary(
     val hasTodaySteps: Boolean = false,
     val sleepDurationHours: Double = 0.0,
     val hasSleepDuration: Boolean = false,
+    val todayWeightKilograms: Double = 0.0,
+    val hasTodayWeight: Boolean = false,
+    val weightHistoryRaw: String = "",
     val workoutType: String = "",
     val workoutDurationMinutes: Double = 0.0,
     val hasWorkout: Boolean = false,
@@ -246,8 +249,14 @@ private fun StoredDailyRecord.sanitizeForHistory(todayKey: String): StoredDailyR
 }
 
 private fun StoredHealthSummary.sanitize(): StoredHealthSummary {
+    val normalizedWeight = todayWeightKilograms.coerceAtLeast(0.0)
+    val normalizedHasTodayWeight = hasTodayWeight && normalizedWeight > 0.0
+
     return copy(
         authorizationState = parseAuthorizationState(authorizationState).name,
+        todayWeightKilograms = if (normalizedHasTodayWeight) normalizedWeight else 0.0,
+        hasTodayWeight = normalizedHasTodayWeight,
+        weightHistoryRaw = weightHistoryRaw.trim(),
         workoutType = canonicalizeWorkoutTypeLabel(workoutType),
         workoutDurationMinutes = workoutDurationMinutes.coerceAtLeast(0.0),
         workoutStartDateIso = workoutStartDateIso.trim(),
@@ -278,8 +287,9 @@ private fun AppUiState.toStoredDailyRecord(
     todayKey: String,
     healthSummary: HealthSummaryUiState
 ): StoredDailyRecord {
-    val normalizedWeight = savedWeight?.trim()?.takeIf { it.isNotEmpty() }
+    val fallbackWeight = savedWeight?.trim()?.takeIf { it.isNotEmpty() }
         ?: weightInput.trim().takeIf { it.isNotEmpty() }
+    val normalizedWeight = healthSummary.recordWeightValueOrNull(fallbackWeight)
     val storedHealthScores = buildStoredHealthScores(
         state = this,
         healthSummary = healthSummary
@@ -381,6 +391,9 @@ private fun HealthSummaryUiState.toStoredSummary(): StoredHealthSummary {
         hasTodaySteps = hasTodaySteps,
         sleepDurationHours = sleepDurationHours,
         hasSleepDuration = hasSleepDuration,
+        todayWeightKilograms = todayWeightKilograms,
+        hasTodayWeight = hasTodayWeight,
+        weightHistoryRaw = weightHistoryRaw,
         workoutType = workoutType,
         workoutDurationMinutes = workoutDurationMinutes,
         hasWorkout = hasWorkout,
@@ -406,6 +419,9 @@ internal fun StoredHealthSummary.toUiState(): HealthSummaryUiState {
         hasTodaySteps = hasTodaySteps,
         sleepDurationHours = sleepDurationHours,
         hasSleepDuration = hasSleepDuration,
+        todayWeightKilograms = todayWeightKilograms,
+        hasTodayWeight = hasTodayWeight,
+        weightHistoryRaw = weightHistoryRaw,
         workoutType = workoutType,
         workoutDurationMinutes = workoutDurationMinutes,
         hasWorkout = hasWorkout,
@@ -421,6 +437,15 @@ internal fun StoredHealthSummary.toUiState(): HealthSummaryUiState {
         scoreAdditionalWorkoutsRaw = scoreAdditionalWorkoutsRaw,
         lastUpdatedAt = lastUpdatedAt
     )
+}
+
+private fun HealthSummaryUiState.recordWeightValueOrNull(fallbackValue: String?): String? {
+    val normalizedFallback = fallbackValue?.trim()?.takeIf { it.isNotEmpty() }
+    return if (authorizationState == HealthAuthorizationState.Authorized) {
+        formattedTodayWeightValueOrNull()
+    } else {
+        normalizedFallback
+    }
 }
 
 private fun sanitizeOptions(values: List<String>, fallback: List<String>): List<String> {

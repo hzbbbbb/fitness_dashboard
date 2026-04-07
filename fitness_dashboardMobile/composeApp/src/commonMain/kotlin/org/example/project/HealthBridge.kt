@@ -22,6 +22,9 @@ data class HealthSummaryUiState(
     val hasTodaySteps: Boolean = false,
     val sleepDurationHours: Double = 0.0,
     val hasSleepDuration: Boolean = false,
+    val todayWeightKilograms: Double = 0.0,
+    val hasTodayWeight: Boolean = false,
+    val weightHistoryRaw: String = "",
     val workoutType: String = "",
     val workoutDurationMinutes: Double = 0.0,
     val hasWorkout: Boolean = false,
@@ -41,6 +44,11 @@ data class HealthSummaryUiState(
 internal data class WorkoutDisplayEntry(
     val type: String,
     val durationMinutes: Double
+)
+
+internal data class WeightHistoryEntry(
+    val day: CalendarDay,
+    val kilograms: Double
 )
 
 object HealthSummaryBridge {
@@ -103,6 +111,9 @@ fun updateHealthAuthorized(
     hasTodaySteps: Boolean,
     sleepDurationHours: Double,
     hasSleepDuration: Boolean,
+    todayWeightKilograms: Double,
+    hasTodayWeight: Boolean,
+    weightHistoryRaw: String,
     workoutType: String,
     workoutDurationMinutes: Double,
     hasWorkout: Boolean,
@@ -127,6 +138,13 @@ fun updateHealthAuthorized(
             hasTodaySteps = hasTodaySteps,
             sleepDurationHours = sleepDurationHours,
             hasSleepDuration = hasSleepDuration,
+            todayWeightKilograms = if (hasTodayWeight) {
+                todayWeightKilograms.coerceAtLeast(0.0)
+            } else {
+                0.0
+            },
+            hasTodayWeight = hasTodayWeight && todayWeightKilograms > 0.0,
+            weightHistoryRaw = weightHistoryRaw.trim(),
             workoutType = workoutType,
             workoutDurationMinutes = workoutDurationMinutes,
             hasWorkout = hasWorkout,
@@ -177,6 +195,46 @@ internal fun HealthSummaryUiState.additionalWorkoutCount(): Int =
 
 internal fun HealthSummaryUiState.hasMultipleWorkouts(): Boolean =
     additionalWorkoutCount() > 0
+
+internal fun formatWeightKilograms(value: Double): String {
+    val roundedTenths = (value * 10.0).roundToInt()
+    val integerPart = roundedTenths / 10
+    val decimalPart = roundedTenths % 10
+    return "$integerPart.$decimalPart"
+}
+
+internal fun HealthSummaryUiState.formattedTodayWeightValueOrNull(): String? {
+    if (!hasTodayWeight || todayWeightKilograms <= 0.0) {
+        return null
+    }
+
+    return formatWeightKilograms(todayWeightKilograms)
+}
+
+internal fun HealthSummaryUiState.formattedTodayWeightTextOrNull(): String? =
+    formattedTodayWeightValueOrNull()?.let { "$it kg" }
+
+internal fun HealthSummaryUiState.weightHistoryEntries(): List<WeightHistoryEntry> {
+    return weightHistoryRaw
+        .lineSequence()
+        .map(String::trim)
+        .filter(String::isNotEmpty)
+        .mapNotNull { line ->
+            val parts = line.split('\t', limit = 2)
+            val day = parseStorageKeyToCalendarDayOrNull(parts.firstOrNull().orEmpty()) ?: return@mapNotNull null
+            val kilograms = parts.getOrNull(1)
+                ?.toDoubleOrNull()
+                ?.takeIf { it > 0.0 }
+                ?: return@mapNotNull null
+            WeightHistoryEntry(
+                day = day,
+                kilograms = kilograms
+            )
+        }
+        .associateBy(WeightHistoryEntry::day)
+        .values
+        .sortedBy(WeightHistoryEntry::day)
+}
 
 internal fun formatSleepDuration(hours: Double): String {
     val totalMinutes = (hours * 60.0).roundToInt()

@@ -26,6 +26,26 @@ internal fun CalendarDay.toStorageKey(): String =
         append(dayOfMonth.toString().padStart(2, '0'))
     }
 
+internal fun parseStorageKeyToCalendarDayOrNull(value: String): CalendarDay? {
+    val parts = value.trim().split('-')
+    if (parts.size != 3) {
+        return null
+    }
+
+    val year = parts[0].toIntOrNull() ?: return null
+    val month = parts[1].toIntOrNull() ?: return null
+    val dayOfMonth = parts[2].toIntOrNull() ?: return null
+    if (month !in 1..12 || dayOfMonth !in 1..31) {
+        return null
+    }
+
+    return CalendarDay(
+        year = year,
+        month = month,
+        dayOfMonth = dayOfMonth
+    )
+}
+
 internal fun CalendarDay.plusDays(days: Int): CalendarDay =
     civilFromEpochDay(epochDay() + days)
 
@@ -37,6 +57,16 @@ internal fun CalendarDay.dayOfWeekIso(): Int =
 
 internal fun CalendarDay.startOfWeekMonday(): CalendarDay =
     plusDays(1 - dayOfWeekIso())
+
+internal fun CalendarDay.daysUntil(other: CalendarDay): Int =
+    other.epochDay() - epochDay()
+
+internal fun CalendarDay.formatMonthDayText(): String =
+    buildString {
+        append(month.toString().padStart(2, '0'))
+        append('/')
+        append(dayOfMonth.toString().padStart(2, '0'))
+    }
 
 private fun CalendarDay.epochDay(): Int =
     daysFromCivil(

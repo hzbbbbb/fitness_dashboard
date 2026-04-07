@@ -294,14 +294,21 @@ internal enum class AppScreen(val label: String, val icon: String) {
     Settings("设置", "⚙")
 }
 
+private enum class RecordsSubpage(val depth: Int) {
+    Home(0),
+    WeightHistory(1)
+}
+
 // ─── Root Composable ───────────────────────────────────────────────────────────
 
 @Composable
 fun MainScaffold() {
     var currentScreen by remember { mutableStateOf(AppScreen.Home) }
+    var recordsSubpage by remember { mutableStateOf(RecordsSubpage.Home) }
     var appState by remember { mutableStateOf(AppUiState()) }
     val dateInfo = remember { getDateInfo() }
     val today = remember { getCurrentDate() }
+    val todayDate = remember(dateInfo) { dateInfo.toCalendarDay() }
     val todayKey = remember(dateInfo) { storageDateKey(dateInfo) }
     val healthSummaryState = currentHealthSummaryState()
     var hasLoadedPersistence by remember { mutableStateOf(false) }
@@ -340,6 +347,9 @@ fun MainScaffold() {
         healthSummaryState.hasTodaySteps,
         healthSummaryState.sleepDurationHours,
         healthSummaryState.hasSleepDuration,
+        healthSummaryState.todayWeightKilograms,
+        healthSummaryState.hasTodayWeight,
+        healthSummaryState.weightHistoryRaw,
         healthSummaryState.workoutType,
         healthSummaryState.workoutDurationMinutes,
         healthSummaryState.hasWorkout,
@@ -367,7 +377,6 @@ fun MainScaffold() {
     LaunchedEffect(
         hasLoadedPersistence,
         todayKey,
-        appState.weightInput,
         appState.note
     ) {
         if (hasLoadedPersistence) {
@@ -404,23 +413,37 @@ fun MainScaffold() {
                             state = appState,
                             today = today
                         )
-                        AppScreen.Records -> RecordsScreen(
-                            state = appState,
-                            healthState = healthSummaryState,
-                            today = today,
-                            onWeightChange = { input ->
-                                appState = appState.withAutoSavedWeight(input)
-                            },
-                            onTrainingChange = { training ->
-                                appState = appState.copy(selectedTraining = training)
-                            },
-                            onSupplementsChange = { supplements ->
-                                appState = appState.copy(checkedSupplements = supplements)
-                            },
-                            onNoteChange = { note ->
-                                appState = appState.copy(note = note)
+                        AppScreen.Records -> FitBoardPageTransition(
+                            targetState = recordsSubpage,
+                            depth = RecordsSubpage::depth,
+                            modifier = Modifier.fillMaxSize()
+                        ) { subpage ->
+                            when (subpage) {
+                                RecordsSubpage.Home -> RecordsScreen(
+                                    state = appState,
+                                    healthState = healthSummaryState,
+                                    today = today,
+                                    onWeightCardClick = {
+                                        recordsSubpage = RecordsSubpage.WeightHistory
+                                    },
+                                    onTrainingChange = { training ->
+                                        appState = appState.copy(selectedTraining = training)
+                                    },
+                                    onSupplementsChange = { supplements ->
+                                        appState = appState.copy(checkedSupplements = supplements)
+                                    },
+                                    onNoteChange = { note ->
+                                        appState = appState.copy(note = note)
+                                    }
+                                )
+
+                                RecordsSubpage.WeightHistory -> WeightHistoryScreen(
+                                    healthState = healthSummaryState,
+                                    todayDate = todayDate,
+                                    onBack = { recordsSubpage = RecordsSubpage.Home }
+                                )
                             }
-                        )
+                        }
                         AppScreen.Settings -> SettingsScreen(
                             state = appState,
                             onStateChange = { appState = it }
@@ -442,7 +465,12 @@ fun MainScaffold() {
 
                     FitBoardBottomNav(
                         current = currentScreen,
-                        onSelect = { currentScreen = it }
+                        onSelect = { selectedScreen ->
+                            currentScreen = selectedScreen
+                            if (selectedScreen != AppScreen.Records) {
+                                recordsSubpage = RecordsSubpage.Home
+                            }
+                        }
                     )
                 }
             }

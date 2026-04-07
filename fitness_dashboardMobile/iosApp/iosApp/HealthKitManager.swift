@@ -7,6 +7,7 @@ import ComposeApp
 final class HealthKitManager: ObservableObject {
     private let healthStore = HKHealthStore()
     private let stepType = HKQuantityType.quantityType(forIdentifier: .stepCount)
+    private let bodyMassType = HKQuantityType.quantityType(forIdentifier: .bodyMass)
     private let sleepType = HKObjectType.categoryType(forIdentifier: .sleepAnalysis)
     private let workoutType = HKObjectType.workoutType()
     private var hasBootstrapped = false
@@ -35,14 +36,14 @@ final class HealthKitManager: ObservableObject {
             return
         }
 
-        guard let stepType, let sleepType else {
+        guard let stepType, let sleepType, let bodyMassType else {
             HealthBridgeKt.updateHealthError(message: "HealthKit 数据类型初始化失败。")
             return
         }
 
         HealthBridgeKt.updateHealthLoading(message: "正在请求 Apple 健康读取权限...")
 
-        let readTypes: Set<HKObjectType> = [stepType, sleepType, workoutType]
+        let readTypes: Set<HKObjectType> = [stepType, sleepType, bodyMassType, workoutType]
         healthStore.requestAuthorization(toShare: nil, read: readTypes) { [weak self] success, error in
             DispatchQueue.main.async {
                 guard let self else { return }
@@ -63,12 +64,12 @@ final class HealthKitManager: ObservableObject {
     }
 
     private func refreshHealthData() {
-        guard let stepType, let sleepType else {
+        guard let stepType, let sleepType, let bodyMassType else {
             HealthBridgeKt.updateHealthError(message: "HealthKit 数据类型初始化失败。")
             return
         }
 
-        HealthBridgeKt.updateHealthLoading(message: "正在读取今日步数、睡眠和训练数据...")
+        HealthBridgeKt.updateHealthLoading(message: "正在读取今日步数、睡眠、训练和体重数据...")
 
         let group = DispatchGroup()
 
@@ -76,6 +77,9 @@ final class HealthKitManager: ObservableObject {
         var hasStepData = false
         var sleepHours = 0.0
         var hasSleepData = false
+        var todayWeightKilograms = 0.0
+        var hasTodayWeight = false
+        var weightHistoryRaw = ""
         var workoutSummary = TodayWorkoutSummary.empty
         var hasWorkoutData = false
         var failureMessage: String?
@@ -118,6 +122,40 @@ final class HealthKitManager: ObservableObject {
         }
 
         group.enter()
+        fetchTodayLatestBodyMass(for: bodyMassType) { result in
+            switch result {
+            case .success(let value):
+                todayWeightKilograms = value
+                hasTodayWeight = true
+            case .failure(let error):
+                if self.isAuthorizationDeniedError(error) {
+                    hasAuthorizationDenied = true
+                } else {
+                    failureMessage = error.localizedDescription
+                }
+            case .noData:
+                hasTodayWeight = false
+            }
+            group.leave()
+        }
+
+        group.enter()
+        fetchRecentBodyMassHistory(for: bodyMassType) { result in
+            switch result {
+            case .success(let encodedHistory):
+                weightHistoryRaw = encodedHistory
+            case .failure(let error):
+                if self.isAuthorizationDeniedError(error) {
+                    hasAuthorizationDenied = true
+                }
+                weightHistoryRaw = ""
+            case .noData:
+                weightHistoryRaw = ""
+            }
+            group.leave()
+        }
+
+        group.enter()
         fetchTodayWorkoutSummary { result in
             switch result {
             case .success(let summary):
@@ -136,8 +174,8 @@ final class HealthKitManager: ObservableObject {
         }
 
         group.notify(queue: .main) {
-            if hasAuthorizationDenied && !hasStepData && !hasSleepData && !hasWorkoutData {
-                HealthBridgeKt.updateHealthDenied(message: "未获得 Apple 健康读取权限，请前往系统设置开启步数、睡眠和训练读取权限。")
+            if hasAuthorizationDenied && !hasStepData && !hasSleepData && !hasTodayWeight && !hasWorkoutData {
+                HealthBridgeKt.updateHealthDenied(message: "未获得 Apple 健康读取权限，请前往系统设置开启步数、睡眠、训练和体重读取权限。")
                 return
             }
 
@@ -151,8 +189,8 @@ final class HealthKitManager: ObservableObject {
             formatter.dateFormat = "HH:mm"
 
             let message: String
-            if !hasStepData && !hasSleepData && !hasWorkoutData {
-                message = "Apple 健康暂无今日步数、睡眠或训练数据，请检查系统授权与健康 App 中的数据记录。"
+            if !hasStepData && !hasSleepData && !hasTodayWeight && !hasWorkoutData {
+                message = "Apple 健康暂无今日步数、睡眠、训练或体重数据，请检查系统授权与健康 App 中的数据记录。"
             } else {
                 message = "Apple 健康数据已更新"
             }
@@ -162,6 +200,9 @@ final class HealthKitManager: ObservableObject {
                 hasTodaySteps: hasStepData,
                 sleepDurationHours: sleepHours,
                 hasSleepDuration: hasSleepData,
+                todayWeightKilograms: todayWeightKilograms,
+                hasTodayWeight: hasTodayWeight,
+                weightHistoryRaw: weightHistoryRaw,
                 workoutType: workoutSummary.latestWorkout.typeLabel,
                 workoutDurationMinutes: workoutSummary.latestWorkout.durationMinutes,
                 hasWorkout: hasWorkoutData,
@@ -205,6 +246,110 @@ final class HealthKitManager: ObservableObject {
             }
 
             completion(.success(Int(sum.doubleValue(for: HKUnit.count()))))
+        }
+
+        healthStore.execute(query)
+    }
+
+    private func fetchTodayLatestBodyMass(
+        for type: HKQuantityType,
+        completion: @escaping (HealthFetchResult<Double>) -> Void
+    ) {
+        let now = Date()
+        let startOfDay = Calendar.current.startOfDay(for: now)
+        let predicate = HKQuery.predicateForSamples(withStart: startOfDay, end: now, options: .strictStartDate)
+        let sortDescriptors = [NSSortDescriptor(key: HKSampleSortIdentifierEndDate, ascending: false)]
+
+        let query = HKSampleQuery(
+            sampleType: type,
+            predicate: predicate,
+            limit: 1,
+            sortDescriptors: sortDescriptors
+        ) { _, samples, error in
+            if let error {
+                completion(.failure(error))
+                return
+            }
+
+            guard let sample = (samples as? [HKQuantitySample])?.first else {
+                completion(.noData)
+                return
+            }
+
+            let value = sample.quantity.doubleValue(for: HKUnit.gramUnit(with: .kilo))
+            guard value > 0 else {
+                completion(.noData)
+                return
+            }
+
+            completion(.success(value))
+        }
+
+        healthStore.execute(query)
+    }
+
+    private func fetchRecentBodyMassHistory(
+        for type: HKQuantityType,
+        completion: @escaping (HealthFetchResult<String>) -> Void
+    ) {
+        let now = Date()
+        let calendar = Calendar.current
+        let endDate = now
+        let startOfToday = calendar.startOfDay(for: now)
+
+        guard let startDate = calendar.date(byAdding: .day, value: -29, to: startOfToday) else {
+            completion(.noData)
+            return
+        }
+
+        let predicate = HKQuery.predicateForSamples(withStart: startDate, end: endDate, options: .strictStartDate)
+        let sortDescriptors = [NSSortDescriptor(key: HKSampleSortIdentifierEndDate, ascending: false)]
+
+        let query = HKSampleQuery(
+            sampleType: type,
+            predicate: predicate,
+            limit: HKObjectQueryNoLimit,
+            sortDescriptors: sortDescriptors
+        ) { _, samples, error in
+            if let error {
+                completion(.failure(error))
+                return
+            }
+
+            guard let quantitySamples = samples as? [HKQuantitySample], !quantitySamples.isEmpty else {
+                completion(.noData)
+                return
+            }
+
+            let formatter = DateFormatter()
+            formatter.calendar = calendar
+            formatter.locale = Locale(identifier: "en_US_POSIX")
+            formatter.timeZone = calendar.timeZone
+            formatter.dateFormat = "yyyy-MM-dd"
+
+            var latestWeightByDay: [String: Double] = [:]
+            for sample in quantitySamples {
+                let kilograms = sample.quantity.doubleValue(for: HKUnit.gramUnit(with: .kilo))
+                guard kilograms > 0 else { continue }
+
+                let dateKey = formatter.string(from: sample.endDate)
+                if latestWeightByDay[dateKey] == nil {
+                    latestWeightByDay[dateKey] = kilograms
+                }
+            }
+
+            let encoded = latestWeightByDay.keys
+                .sorted()
+                .compactMap { dayKey in
+                    latestWeightByDay[dayKey].map { "\(dayKey)\t\($0)" }
+                }
+                .joined(separator: "\n")
+
+            if encoded.isEmpty {
+                completion(.noData)
+            } else {
+                completion(.success(encoded))
+            }
         }
 
         healthStore.execute(query)

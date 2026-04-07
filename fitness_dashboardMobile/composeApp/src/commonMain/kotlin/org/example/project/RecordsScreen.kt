@@ -20,7 +20,6 @@ import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
@@ -37,7 +36,6 @@ import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlin.math.roundToInt
@@ -47,7 +45,7 @@ fun RecordsScreen(
     state: AppUiState,
     healthState: HealthSummaryUiState,
     today: String,
-    onWeightChange: (String) -> Unit,
+    onWeightCardClick: () -> Unit,
     onTrainingChange: (String?) -> Unit,
     onSupplementsChange: (Set<String>) -> Unit,
     onNoteChange: (String) -> Unit
@@ -109,9 +107,8 @@ fun RecordsScreen(
             Spacer(Modifier.height(12.dp))
 
             WeightRecordCard(
-                weightInput = state.weightInput,
-                savedWeight = state.savedWeight,
-                onWeightChange = onWeightChange
+                healthState = healthState,
+                onClick = onWeightCardClick
             )
             Spacer(Modifier.height(12.dp))
 
@@ -155,10 +152,11 @@ private fun RecordCompletenessBanner(
     healthState: HealthSummaryUiState
 ) {
     val hasReadOnlyWorkout = healthState.hasNonStrengthWorkout()
-    val trainingRecorded = hasReadOnlyWorkout || state.selectedTraining != null
+    val hasStrengthSelection = healthState.hasTraditionalStrengthWorkout() && state.selectedTraining != null
+    val trainingRecorded = hasReadOnlyWorkout || hasStrengthSelection
     val filledCount = listOfNotNull(
         if (trainingRecorded) "training" else null,
-        state.savedWeight,
+        healthState.formattedTodayWeightValueOrNull(),
         if (state.checkedSupplements.isNotEmpty()) "sup" else null,
         if (state.note.isNotEmpty()) "note" else null
     ).size
@@ -212,59 +210,53 @@ private fun RecordCompletenessBanner(
 
 @Composable
 internal fun WeightRecordCard(
-    weightInput: String,
-    savedWeight: String?,
-    onWeightChange: (String) -> Unit
+    healthState: HealthSummaryUiState,
+    onClick: () -> Unit
 ) {
-    FitCard {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.Top
-        ) {
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                CardLabel("体重")
-                CardTitle("体重录入")
-            }
-        }
+    val weightText = healthState.formattedTodayWeightTextOrNull()
+    val isLoadingWeight = healthState.authorizationState == HealthAuthorizationState.Loading && weightText == null
 
-        Spacer(Modifier.height(14.dp))
-
-        OutlinedTextField(
-            value = weightInput,
-            onValueChange = onWeightChange,
-            modifier = Modifier.fillMaxWidth(),
-            placeholder = {
-                Text("输入今日体重 (kg)", color = FitBoardColors.textHint, fontSize = 14.sp)
-            },
-            singleLine = true,
-            shape = RoundedCornerShape(14.dp),
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedBorderColor = FitBoardColors.activeCardBorder,
-                unfocusedBorderColor = FitBoardColors.inactiveCardBorder,
-                focusedContainerColor = FitBoardColors.cardBg,
-                unfocusedContainerColor = FitBoardColors.inactiveCardBg,
-                cursorColor = FitBoardColors.textPrimary,
-                focusedTextColor = FitBoardColors.textPrimary,
-                unfocusedTextColor = FitBoardColors.textPrimary,
-            )
-        )
-
-        if (savedWeight != null) {
-            Spacer(Modifier.height(10.dp))
-
-            Box(
-                modifier = Modifier
-                    .clip(RoundedCornerShape(20.dp))
-                    .background(FitBoardColors.weightSavedBadgeBg)
-                    .padding(horizontal = 10.dp, vertical = 3.dp)
+    FitCard(
+        modifier = Modifier.clickable { onClick() }
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
+                CardLabel("体重")
                 Text(
-                    text = "$savedWeight kg",
+                    text = "查看",
                     fontSize = 13.sp,
                     fontWeight = FontWeight.Medium,
-                    color = FitBoardColors.badgeActiveText
+                    color = FitBoardColors.textSecondary
+                )
+            }
+            Text(
+                text = when {
+                    weightText != null -> weightText
+                    isLoadingWeight -> "正在读取今日体重"
+                    else -> "暂无今日体重"
+                },
+                fontSize = if (weightText != null) 32.sp else 22.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = FitBoardColors.textPrimary
+            )
+
+            if (weightText != null) {
+                Text(
+                    text = "今日最新",
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = FitBoardColors.textSecondary
+                )
+            } else if (isLoadingWeight) {
+                Text(
+                    text = "Apple Health",
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = FitBoardColors.textHint
                 )
             }
         }
@@ -280,20 +272,16 @@ internal fun TrainingRecordCard(
 ) {
     val hasDisplayWorkout = healthState.hasWorkout && healthState.primaryWorkoutDisplayType().isNotBlank()
     val hasTraditionalStrengthWorkout = healthState.hasTraditionalStrengthWorkout()
-    val hasReadOnlyWorkout = healthState.hasNonStrengthWorkout()
     val primaryWorkoutType = healthState.primaryWorkoutDisplayType()
     val primaryWorkoutDurationMinutes = healthState.primaryWorkoutDisplayDurationMinutes()
     val additionalWorkouts = healthState.additionalWorkoutEntries()
     val strengthItems = remember(items) {
         items.strengthTrainingItems()
     }
-    val otherWorkoutItem = remember(items) {
-        items.otherWorkoutItem()
-    }
-    val visibleItems = if (hasTraditionalStrengthWorkout) strengthItems else items
+    val shouldShowStrengthSelection = hasTraditionalStrengthWorkout
     val workoutDisplayName = when {
         hasTraditionalStrengthWorkout -> "传统力量训练"
-        hasReadOnlyWorkout -> primaryWorkoutType.ifEmpty { otherWorkoutItem.name }
+        hasDisplayWorkout -> primaryWorkoutType
         else -> primaryWorkoutType
     }
 
@@ -309,20 +297,25 @@ internal fun TrainingRecordCard(
                 durationMinutes = primaryWorkoutDurationMinutes
             )
 
-            if (additionalWorkouts.isNotEmpty() || !hasReadOnlyWorkout) {
+            if (additionalWorkouts.isNotEmpty() || shouldShowStrengthSelection) {
                 Spacer(Modifier.height(12.dp))
             }
+        } else {
+            WorkoutSummaryPanel(
+                workoutType = "今日无训练",
+                durationMinutes = 0.0
+            )
         }
 
         if (additionalWorkouts.isNotEmpty()) {
             AdditionalWorkoutListPanel(items = additionalWorkouts)
 
-            if (!hasReadOnlyWorkout) {
+            if (shouldShowStrengthSelection) {
                 Spacer(Modifier.height(12.dp))
             }
         }
 
-        if (!hasReadOnlyWorkout) {
+        if (shouldShowStrengthSelection) {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -332,7 +325,7 @@ internal fun TrainingRecordCard(
                     .padding(8.dp),
                 verticalArrangement = Arrangement.spacedBy(6.dp)
             ) {
-                visibleItems.forEach { item ->
+                strengthItems.forEach { item ->
                     SelectableRecordItem(
                         label = item.name,
                         isActive = item.name == selected,
@@ -610,7 +603,6 @@ private fun List<TrainingItemConfig>.otherWorkoutItem(): TrainingItemConfig {
     return firstOrNull { it.category == TrainingCategory.OtherWorkout }
         ?: DEFAULT_TRAINING_ITEMS.first { it.category == TrainingCategory.OtherWorkout }
 }
-
 private fun Double.formatWorkoutDurationText(): String? {
     if (this <= 0.0) {
         return null
