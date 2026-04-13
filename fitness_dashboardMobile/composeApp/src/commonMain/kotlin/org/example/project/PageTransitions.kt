@@ -10,9 +10,13 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.unit.IntOffset
 import kotlin.math.max
 
@@ -39,7 +43,20 @@ internal fun <T> FitBoardPageTransition(
         },
         label = "fitBoardPageTransition"
     ) { state ->
-        content(state)
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(
+                    Brush.verticalGradient(
+                        listOf(
+                            FitBoardColors.bgGradientStart,
+                            FitBoardColors.bgGradientEnd
+                        )
+                    )
+                )
+        ) {
+            content(state)
+        }
     }
 }
 
