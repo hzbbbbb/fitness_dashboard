@@ -1,35 +1,91 @@
-This is a Kotlin Multiplatform project targeting Android, iOS.
+# FitBoard Mobile
 
-* [/composeApp](./composeApp/src) is for code that will be shared across your Compose Multiplatform applications.
-  It contains several subfolders:
-  - [commonMain](./composeApp/src/commonMain/kotlin) is for code that’s common for all targets.
-  - Other folders are for Kotlin code that will be compiled for only the platform indicated in the folder name.
-    For example, if you want to use Apple’s CoreCrypto for the iOS part of your Kotlin app,
-    the [iosMain](./composeApp/src/iosMain/kotlin) folder would be the right place for such calls.
-    Similarly, if you want to edit the Desktop (JVM) specific part, the [jvmMain](./composeApp/src/jvmMain/kotlin)
-    folder is the appropriate location.
+FitBoard Mobile 是 FitBoard 的移动端实现，当前基于 `Kotlin Multiplatform + Compose Multiplatform` 开发，主要围绕 iOS 使用场景构建，并保留 Android 目标。
 
-* [/iosApp](./iosApp/iosApp) contains iOS applications. Even if you’re sharing your UI with Compose Multiplatform,
-  you need this entry point for your iOS app. This is also where you should add SwiftUI code for your project.
+## 当前页面结构
 
-### Build and Run Android Application
+- 首页
+  - Apple Health 摘要
+  - 摘要卡片编辑
+  - 热力图与近期状态
 
-To build and run the development version of the Android app, use the run configuration from the run widget
-in your IDE’s toolbar or build it directly from the terminal:
-- on macOS/Linux
-  ```shell
-  ./gradlew :composeApp:assembleDebug
-  ```
-- on Windows
-  ```shell
-  .\gradlew.bat :composeApp:assembleDebug
-  ```
+- 评分页
+  - 当天健康分
+  - 睡眠 / 步数 / 训练 / 补剂四项评分
 
-### Build and Run iOS Application
+- 记录页
+  - 今日体重
+  - 今日训练
+  - 今日补剂
+  - 备注
 
-To build and run the development version of the iOS app, use the run configuration from the run widget
-in your IDE’s toolbar or open the [/iosApp](./iosApp) directory in Xcode and run it from there.
+- 体重记录页
+  - 今日最新体重
+  - 最近 7 天 / 30 天趋势
+  - 本周平均
+  - 较上周变化
+  - 最近记录列表
 
----
+- 设置页
+  - 训练类型
+  - 补剂类型
+  - 睡眠目标
+  - 步数目标
+  - 风格
+  - 本地数据
+  - 关于
 
-Learn more about [Kotlin Multiplatform](https://www.jetbrains.com/help/kotlin-multiplatform-dev/get-started.html)…
+## Apple Health 接入
+
+当前 iOS 宿主层已接入 Apple Health 只读权限，读取以下数据：
+
+- 步数 `stepCount`
+- 睡眠 `sleepAnalysis`
+- 训练 `workout`
+- 体重 `bodyMass`
+
+说明：
+
+- 当前只读，不写回 Apple Health
+- 今日体重优先显示当天最新一条
+- 体重历史使用“每天最新一条”作为展示口径
+
+## 本地数据
+
+- 应用配置与每日记录保存到本地文件
+- 当天健康摘要可同步进入记录状态
+- 当前以本地单机使用为主
+
+## 目录说明
+
+- `composeApp/src/commonMain/kotlin`
+  - 共享 Compose UI 和业务逻辑
+
+- `composeApp/src/iosMain/kotlin`
+  - iOS 侧实际实现
+
+- `composeApp/src/androidMain/kotlin`
+  - Android 侧实际实现
+
+- `iosApp/iosApp`
+  - iOS 宿主工程
+  - 包含 SwiftUI 入口和 HealthKit 读取实现
+
+## 常用命令
+
+在 `fitness_dashboardMobile` 目录下运行：
+
+```bash
+./gradlew :composeApp:compileKotlinIosSimulatorArm64
+```
+
+```bash
+xcodebuild -project iosApp/iosApp.xcodeproj -scheme iosApp -configuration Debug -destination 'generic/platform=iOS Simulator' build
+```
+
+## 当前开发重点
+
+- iOS 体验优先
+- 本地优先
+- Apple Health 只读整合
+- 页面结构和记录链路持续补齐
